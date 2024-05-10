@@ -23,8 +23,9 @@ public:
 	const std::map<std::uint64_t, Edge>& GetEdges() const { return myEdges; }
 
 	bool Evaluate(const std::vector<double>& someInputs, std::vector<double>& someOutputs);
-	void SetFitness(double aFitness) { myFitness = aFitness; }
+	void SetFitness(double aFitness);
 	double GetFitness() const { return myFitness; }
+	double GetAdjustedFitness() const { return myAdjustedFitness; }
 
 private:
 	size_t GetHiddenNodesCount() const { return myNodes.size() - 1 - myInputCount - myOutputCount; } // -1 for Bias
@@ -41,6 +42,7 @@ private:
 	size_t myOutputCount = 0;
 
 	double myFitness = 0.0;
+	double myAdjustedFitness = 0.0;
 	Specie* mySpecie = nullptr;
 };
 

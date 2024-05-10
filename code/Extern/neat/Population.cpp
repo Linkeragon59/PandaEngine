@@ -24,4 +24,14 @@ const Genome* Population::GetBestGenome() const
 	return bestGenome;
 }
 
+void Population::GroupSpecies()
+{
+	// TODO
+}
+
+void Population::ReplacePopulationWithOffsprings()
+{
+	// TODO
+}
+
 }

@@ -1,6 +1,7 @@
 #include "Genome.h"
 
 #include "EvolutionParams.h"
+#include "Specie.h"
 
 #include <fstream>
 #include <sstream>
@@ -213,6 +214,16 @@ bool Genome::Evaluate(const std::vector<double>& someInputs, std::vector<double>
 		someOutputs[i] = myNodes[i + myNodes.size() - myOutputCount].GetOutputValue();
 
 	return true;
+}
+
+void Genome::SetFitness(double aFitness)
+{
+	myFitness = aFitness;
+	myAdjustedFitness = aFitness;
+	if (mySpecie)
+	{
+		myAdjustedFitness /= mySpecie->GetSize();
+	}
 }
 
 void Genome::LinkNodes(size_t aSrcNodeIdx, size_t aDstNodeIdx, double aWeight, bool anEnable)

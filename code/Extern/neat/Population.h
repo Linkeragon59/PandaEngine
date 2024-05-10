@@ -16,6 +16,10 @@ public:
 	Genome* GetGenome(size_t aGenomeIdx) { return aGenomeIdx < myGenomes.size() ? &myGenomes[aGenomeIdx] : nullptr; }
 	const Genome* GetBestGenome() const;
 
+	std::vector<Specie>& GetSpecies() { return mySpecies; }
+	void GroupSpecies();
+	void ReplacePopulationWithOffsprings();
+
 private:
 	std::vector<Genome> myGenomes;
 	std::vector<Specie> mySpecies;

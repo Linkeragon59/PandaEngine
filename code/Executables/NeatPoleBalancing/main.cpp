@@ -1,5 +1,6 @@
 #include "Genome.h"
 #include "EvolutionParams.h"
+#include "Specie.h"
 #include "Population.h"
 #include <stdlib.h>
 #include <random>
@@ -236,7 +237,7 @@ void TrainNeatOneGeneration(Thread::WorkerPool& aPool, Neat::Population& aPopula
 {
 	uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
 
-	// TODO : Group species
+	aPopulation.GroupSpecies();
 
 	size_t runPerThread = aPopulation.GetSize() / aPool.GetWorkersCount();
 	size_t startIdx = 0;
@@ -248,11 +249,16 @@ void TrainNeatOneGeneration(Thread::WorkerPool& aPool, Neat::Population& aPopula
 
 	aPool.WaitIdle();
 
-	// TODO : Make offsprings, different species in parallel
+	for (Neat::Specie& specie : aPopulation.GetSpecies())
+	{
+		aPool.RequestJob([&specie]() {
+			specie.GenerateOffsprings();
+		});
+	}
 
 	aPool.WaitIdle();
 
-	// TODO : Replace population with species offsprings
+	aPopulation.ReplacePopulationWithOffsprings();
 
 	uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
 	std::cout << duration << std::endl;

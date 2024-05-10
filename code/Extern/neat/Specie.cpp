@@ -46,4 +46,19 @@ bool Specie::BelongsToSpecie(const Genome* aGenome) const
 	return EvolutionParams::ourMatchingGeneCoeff * averageWeightDifference + EvolutionParams::ourMatchingGeneCoeff * nonMatchingGenesCount / maxGenomeSize;
 }
 
+void Specie::GenerateOffsprings()
+{
+	// TODO
+}
+
+size_t Specie::ComputeNextSize(double anAverageFitness) const
+{
+	double newSize = 0.0;
+	for (const Genome* genome : myGenomes)
+	{
+		newSize += genome->GetAdjustedFitness();
+	}
+	return static_cast<size_t>(std::round(newSize / anAverageFitness));
+}
+
 }
