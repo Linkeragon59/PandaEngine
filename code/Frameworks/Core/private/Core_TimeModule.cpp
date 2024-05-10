@@ -25,4 +25,19 @@ namespace Core
 			myFrameCounter++;
 		}
 	}
+	uint64 TimeModule::GetCurrentTimeNs() const
+	{
+		std::chrono::nanoseconds timeNs = std::chrono::high_resolution_clock::now() - myStartTime;
+		return timeNs.count();
+	}
+	uint64 TimeModule::GetCurrentTimeMs() const
+	{
+		std::chrono::nanoseconds timeNs = std::chrono::high_resolution_clock::now() - myStartTime;
+		return std::chrono::duration_cast<std::chrono::milliseconds>(timeNs).count();
+	}
+	float TimeModule::GetCurrentTimeSec() const
+	{
+		std::chrono::duration<float> time = std::chrono::high_resolution_clock::now() - myStartTime;
+		return time.count();
+	}
 }

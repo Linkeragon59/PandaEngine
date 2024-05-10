@@ -199,7 +199,7 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Neat::Population& aPopul
 	aPool.RequestJob([&aPopulation, aStartIdx, aEndIdx]() {
 		for (size_t i = aStartIdx; i < aEndIdx; ++i)
 		{
-			std::chrono::high_resolution_clock::time_point startTime = std::chrono::high_resolution_clock::now();
+			uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
 
 			if (Neat::Genome* genome = aPopulation.GetGenome(i))
 			{
@@ -225,19 +225,16 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Neat::Population& aPopul
 				genome->SetFitness(fitness);
 			}
 
-			std::chrono::high_resolution_clock::time_point currentTime = std::chrono::high_resolution_clock::now();
-			uint64 duration = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count();
+			uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
 
 			std::cout << i << " : " << duration << std::endl;
 		}
 	});
 }
 
-#include <chrono>
-
 void TrainNeatOneGeneration(Thread::WorkerPool& aPool, Neat::Population& aPopulation)
 {
-	std::chrono::high_resolution_clock::time_point startTime = std::chrono::high_resolution_clock::now();
+	uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
 
 	size_t runPerThread = aPopulation.GetSize() / aPool.GetWorkersCount() + 1;
 	size_t startIdx = 0;
@@ -249,8 +246,7 @@ void TrainNeatOneGeneration(Thread::WorkerPool& aPool, Neat::Population& aPopula
 
 	aPool.WaitIdle();
 
-	std::chrono::high_resolution_clock::time_point currentTime = std::chrono::high_resolution_clock::now();
-	uint64 duration = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count();
+	uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
 
 	// Mutate and Cross-Over, different species in parallel
 	std::cout << duration << std::endl;
