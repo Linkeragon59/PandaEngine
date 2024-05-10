@@ -15,7 +15,7 @@ public:
 	Genome(size_t anInputCount, size_t anOutputCount);
 	
 	Genome(const char* aFilePath);
-	void SaveToFile(const char* aFilePath);
+	void SaveToFile(const char* aFilePath) const;
 
 	Genome(const Genome* aParent1, const Genome* aParent2);
 	void Mutate();
@@ -24,6 +24,7 @@ public:
 
 	bool Evaluate(const std::vector<double>& someInputs, std::vector<double>& someOutputs);
 	void SetFitness(double aFitness) { myFitness = aFitness; }
+	double GetFitness() const { return myFitness; }
 
 private:
 	size_t GetHiddenNodesCount() const { return myNodes.size() - 1 - myInputCount - myOutputCount; } // -1 for Bias

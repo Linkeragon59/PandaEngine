@@ -14,6 +14,7 @@ public:
 
 	size_t GetSize() const { return myGenomes.size(); }
 	Genome* GetGenome(size_t aGenomeIdx) { return aGenomeIdx < myGenomes.size() ? &myGenomes[aGenomeIdx] : nullptr; }
+	const Genome* GetBestGenome() const;
 
 private:
 	std::vector<Genome> myGenomes;

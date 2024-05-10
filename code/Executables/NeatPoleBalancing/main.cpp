@@ -132,7 +132,7 @@ void NeatPoleBalancingModule::OnInitialize()
 	myGui = myGuiEntity.AddComponent<Render::EntityGuiComponent>(myWindow, false);
 	myGui->myCallback = [this]() { OnGuiUpdate(); };
 
-	myNeatGenome = new Neat::Genome(4, 1);
+	myNeatGenome = new Neat::Genome("poleBalancing");
 }
 
 void NeatPoleBalancingModule::OnFinalize()
@@ -236,19 +236,25 @@ void TrainNeatOneGeneration(Thread::WorkerPool& aPool, Neat::Population& aPopula
 {
 	uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
 
-	size_t runPerThread = aPopulation.GetSize() / aPool.GetWorkersCount() + 1;
+	// TODO : Group species
+
+	size_t runPerThread = aPopulation.GetSize() / aPool.GetWorkersCount();
 	size_t startIdx = 0;
 	while (startIdx < aPopulation.GetSize())
 	{
 		EvaluatePopulationAsync(aPool, aPopulation, startIdx, startIdx + runPerThread);
-		startIdx += runPerThread;
+		startIdx = std::min(aPopulation.GetSize(), startIdx + runPerThread);
 	}
 
 	aPool.WaitIdle();
 
-	uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
+	// TODO : Make offsprings, different species in parallel
 
-	// Mutate and Cross-Over, different species in parallel
+	aPool.WaitIdle();
+
+	// TODO : Replace population with species offsprings
+
+	uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
 	std::cout << duration << std::endl;
 }
 
@@ -266,14 +272,15 @@ void TrainNeat()
 #endif
 
 	Neat::Population population = Neat::Population(100, 4, 1);
-	Neat::Genome* bestGenome = nullptr;
+	const Neat::Genome* bestGenome = nullptr;
 
+	double fitnessThreshold = 0.5;
 	for (uint i = 0; i < 1; ++i)
 	{
 		TrainNeatOneGeneration(threadPool, population);
-		//bestGenome = population.GetBestGenome();
-		//if (bestGenome && bestGenome->GetFitness() > threshold)
-		//	break;
+		bestGenome = population.GetBestGenome();
+		if (bestGenome && bestGenome->GetFitness() > fitnessThreshold)
+			break;
 	}
 
 	if (bestGenome)

@@ -111,7 +111,7 @@ Genome::Genome(const char* aFilePath)
 	}
 }
 
-void Genome::SaveToFile(const char* aFilePath)
+void Genome::SaveToFile(const char* aFilePath) const
 {
 	std::ofstream file(aFilePath);
 	if (!file.is_open())
@@ -121,7 +121,7 @@ void Genome::SaveToFile(const char* aFilePath)
 
 	for (auto it = myEdges.begin(); it != myEdges.end(); ++it)
 	{
-		Edge& edge = it->second;
+		const Edge& edge = it->second;
 		file << it->first << " " << edge.GetSrcNodeIdx() << " " << edge.GetDstNodeIdx() << " "
 			<< edge.GetWeight() << " " << edge.IsEnabled() << ";" << std::endl;
 	}
