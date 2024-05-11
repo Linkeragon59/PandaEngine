@@ -34,8 +34,8 @@ void Population::TrainOneGeneration(const TrainingCallbacks& someCallbacks)
 	}
 
 	// TODO : Adapt species sizes so the population count remains the same
-	// Bug 1 : For some reasons currently the population size explodes, even if we set a high specie threshold to have only one specie
-	// Bug 2 : Also not sure why the best fitness can decrease even with no variance in the balancing system...
+	// Bug : Not sure why the best fitness can decrease even with no variance in the balancing system...
+	// Problem : Mutations adding topology complexity are not protected at all? They should go into their own specie and be protected...
 
 	if (someCallbacks.myGenerateOffsprings)
 		someCallbacks.myGenerateOffsprings();
