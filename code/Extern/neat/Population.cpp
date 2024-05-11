@@ -11,11 +11,15 @@ Population::Population(size_t aCount, size_t anInputCount, size_t anOutputCount)
 		myGenomes.push_back(baseGenome);
 }
 
-void Population::TrainOneGeneration(std::function<void()> aEvaluateGenomes, std::function<void()> aGenerateOffsprings)
+void Population::TrainOneGeneration(const TrainingCallbacks& someCallbacks)
 {
+	if (someCallbacks.myOnTrainGenerationStart)
+		someCallbacks.myOnTrainGenerationStart();
+
 	GroupSpecies();
 
-	aEvaluateGenomes();
+	if (someCallbacks.myEvaluateGenomes)
+		someCallbacks.myEvaluateGenomes();
 
 	double averageAdjustedFitness = GetAverageAdjustedFitness();
 	for (Neat::Specie& specie : mySpecies)
@@ -25,16 +29,20 @@ void Population::TrainOneGeneration(std::function<void()> aEvaluateGenomes, std:
 
 	// TODO : Adapt species sizes so the population count remains the same
 
-	aGenerateOffsprings();
+	if (someCallbacks.myGenerateOffsprings)
+		someCallbacks.myGenerateOffsprings();
 
 	ReplacePopulationWithOffsprings();
+
+	if (someCallbacks.myOnTrainGenerationEnd)
+		someCallbacks.myOnTrainGenerationEnd();
 }
 
-void Population::TrainGenerations(std::function<void()> aEvaluateGenomes, std::function<void()> aGenerateOffsprings, int aMaxGenerationCount, double aSatisfactionThreshold)
+void Population::TrainGenerations(const TrainingCallbacks& someCallbacks, int aMaxGenerationCount, double aSatisfactionThreshold)
 {
 	for (int i = 0; i < aMaxGenerationCount; ++i)
 	{
-		TrainOneGeneration(aEvaluateGenomes, aGenerateOffsprings);
+		TrainOneGeneration(someCallbacks);
 		const Genome* bestGenome = GetBestGenome();
 		if (bestGenome && bestGenome->GetFitness() > aSatisfactionThreshold)
 			break;

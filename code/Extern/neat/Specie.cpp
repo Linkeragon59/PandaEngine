@@ -75,13 +75,50 @@ size_t Specie::ComputeNextSize(double anAverageAdjustedFitness)
 
 void Specie::GenerateOffsprings()
 {
-	if (myNextSize == 0)
+	if (myNextSize == 0 || myGenomes.size() == 0)
 		return;
 
-	// TODO
-	// Sort the genomes by fitness,
-	// put a copy of the champion in the offsprings
-	// while we can still generate offsprings, randomly choose if we want only mutation or crossover, and select the parents randomely, weighted by their fitness
+	std::sort(myGenomes.begin(), myGenomes.end(), [](const Genome* aGenome1, const Genome* aGenome2) { return aGenome1->GetFitness() > aGenome2->GetFitness(); });
+
+	// Copy the best genome as is for the next generation
+	myOffsprings.push_back(Genome(*myGenomes[0]));
+
+	// Generate as many offsprings as needed
+	// randomly choose if we want only mutation or crossover
+	// and select the parent(s) randomly, weighted by their fitness to favor performing genomes
+	double totalFitness = 0.0;
+	for (const Genome* genome : myGenomes)
+		totalFitness += genome->GetFitness();
+	std::uniform_real_distribution<> rand(0.0, totalFitness);
+	auto getWeightedRandomGenome = [totalFitness, &rand, this]() -> const Genome* {
+		double rng = rand(EvolutionParams::GetRandomGenerator());
+		double cumulFitness = 0.0;
+		for (const Genome* genome : myGenomes)
+		{
+			cumulFitness += genome->GetFitness();
+			if (cumulFitness >= rng)
+				return genome;
+		}
+		// Can't happen
+		return myGenomes[0];
+	};
+
+	while (--myNextSize > 0)
+	{
+		std::uniform_real_distribution<> rand2(0.0, 1.0);
+		if (rand2(EvolutionParams::GetRandomGenerator()) < EvolutionParams::ourSingleParentReproductionProba)
+		{
+			// Offspring from one parent (mutation only)
+			Genome& offspring = myOffsprings.emplace_back(*getWeightedRandomGenome());
+			offspring.Mutate();
+		}
+		else
+		{
+			// Offspring from two parents + mutation
+			Genome& offspring = myOffsprings.emplace_back(getWeightedRandomGenome(), getWeightedRandomGenome());
+			offspring.Mutate();
+		}
+	}
 }
 
 void Specie::CollectOffsprings(std::vector<Genome>& someOutOffsprings)

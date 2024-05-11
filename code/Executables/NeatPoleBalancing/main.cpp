@@ -23,6 +23,8 @@
 
 struct PoleBalancingSystem
 {
+	PoleBalancingSystem(double aStartVariance);
+
 	void Update(double aForce, double aDeltaTime);
 	double GetPoleAngle() const { return std::atan2(std::sin(myPoleAngle), std::cos(myPoleAngle)); }
 	bool IsPoleUp() const { return std::abs(GetPoleAngle()) <= myPoleFailureAngle; }
@@ -45,6 +47,13 @@ struct PoleBalancingSystem
 	double myPoleFailureAngle = 0.209;
 	double myPoleFriction = 0.1;
 };
+
+PoleBalancingSystem::PoleBalancingSystem(double aStartVariance)
+{
+	std::normal_distribution<> rand(0.0, aStartVariance);
+	myPoleAngle = rand(Neat::EvolutionParams::GetRandomGenerator()) * 2.0 * PI;
+	myCartPosition = rand(Neat::EvolutionParams::GetRandomGenerator()) * myTrackSize / 2.0;
+}
 
 void PoleBalancingSystem::Update(double aForceAmplitude, double aDeltaTime)
 {
@@ -117,7 +126,7 @@ private:
 	Core::Entity myGuiEntity;
 	Render::EntityGuiComponent* myGui = nullptr;
 
-	PoleBalancingSystem mySystem;
+	PoleBalancingSystem* mySystem = nullptr;
 	bool myNeatControl = false;
 	Neat::Genome* myNeatGenome = nullptr;
 };
@@ -133,12 +142,14 @@ void NeatPoleBalancingModule::OnInitialize()
 	myGui = myGuiEntity.AddComponent<Render::EntityGuiComponent>(myWindow, false);
 	myGui->myCallback = [this]() { OnGuiUpdate(); };
 
+	mySystem = new PoleBalancingSystem(0.1);
 	myNeatGenome = new Neat::Genome("poleBalancing");
 }
 
 void NeatPoleBalancingModule::OnFinalize()
 {
 	SafeDelete(myNeatGenome);
+	SafeDelete(mySystem);
 
 	myGuiEntity.Destroy();
 
@@ -164,14 +175,14 @@ void NeatPoleBalancingModule::OnUpdate(Core::Module::UpdateType aType)
 		if (myNeatControl)
 		{
 			std::vector<double> inputs;
-			inputs.push_back(mySystem.myPoleAngle);
-			inputs.push_back(mySystem.myPoleVelocity);
-			inputs.push_back(mySystem.myCartPosition);
-			inputs.push_back(mySystem.myCartVelocity);
+			inputs.push_back(mySystem->myPoleAngle);
+			inputs.push_back(mySystem->myPoleVelocity);
+			inputs.push_back(mySystem->myCartPosition);
+			inputs.push_back(mySystem->myCartVelocity);
 			std::vector<double> outputs;
 			myNeatGenome->Evaluate(inputs, outputs);
 
-			mySystem.Update(outputs[0], Core::TimeModule::GetInstance()->GetDeltaTimeSec());
+			mySystem->Update(outputs[0], Core::TimeModule::GetInstance()->GetDeltaTimeSec());
 		}
 		else
 		{
@@ -181,7 +192,7 @@ void NeatPoleBalancingModule::OnUpdate(Core::Module::UpdateType aType)
 			if (Core::InputModule::GetInstance()->PollKeyInput(Input::KeyRight, myWindow) == Input::Status::Pressed)
 				aForceAmplitude += 1.0;
 
-			mySystem.Update(aForceAmplitude, Core::TimeModule::GetInstance()->GetDeltaTimeSec());
+			mySystem->Update(aForceAmplitude, Core::TimeModule::GetInstance()->GetDeltaTimeSec());
 		}
 	}
 	else if (aType == Core::Module::UpdateType::MainUpdate)
@@ -192,7 +203,7 @@ void NeatPoleBalancingModule::OnUpdate(Core::Module::UpdateType aType)
 
 void NeatPoleBalancingModule::OnGuiUpdate()
 {
-	mySystem.Draw();
+	mySystem->Draw();
 }
 
 void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Neat::Population& aPopulation, size_t aStartIdx, size_t aEndIdx)
@@ -200,11 +211,11 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Neat::Population& aPopul
 	aPool.RequestJob([&aPopulation, aStartIdx, aEndIdx]() {
 		for (size_t i = aStartIdx; i < aEndIdx; ++i)
 		{
-			uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
+			//uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
 
 			if (Neat::Genome* genome = aPopulation.GetGenome(i))
 			{
-				PoleBalancingSystem system;
+				PoleBalancingSystem system(0.1);
 				double fitness = 0.0;
 
 				for (uint t = 0; t < 5000; ++t)
@@ -226,8 +237,8 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Neat::Population& aPopul
 				genome->SetFitness(fitness);
 			}
 
-			uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
-			std::cout << i << " : " << duration << std::endl;
+			//uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
+			//std::cout << i << " : " << duration << std::endl;
 		}
 	});
 }
@@ -244,11 +255,10 @@ void TrainNeat()
 	std::random_device rd;
 	Neat::EvolutionParams::SetRandomSeed(rd());
 
-	uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
-
 	Neat::Population population = Neat::Population(100, 4, 1);
-	population.TrainGenerations(
-	[&population, &threadPool]() {
+	Neat::Population::TrainingCallbacks callbacks;
+
+	callbacks.myEvaluateGenomes = [&population, &threadPool]() {
 		size_t runPerThread = population.GetSize() / threadPool.GetWorkersCount();
 		size_t startIdx = 0;
 		while (startIdx < population.GetSize())
@@ -257,17 +267,28 @@ void TrainNeat()
 			startIdx = std::min(population.GetSize(), startIdx + runPerThread);
 		}
 		threadPool.WaitIdle();
-	},
-	[&population, &threadPool] () {
+	};
+
+	callbacks.myGenerateOffsprings = [&population, &threadPool]() {
 		for (Neat::Specie& specie : population.GetSpecies())
 		{
 			threadPool.RequestJob([&specie]() {
 				specie.GenerateOffsprings();
-			});
+				});
 		}
 		threadPool.WaitIdle();
-	},
-	10, 0.5);
+	};
+
+	callbacks.myOnTrainGenerationEnd = [&population]() {
+		if (const Neat::Genome* bestGenome = population.GetBestGenome())
+		{
+			std::cout << "Generation Best Fitness : " << bestGenome->GetFitness() << std::endl;
+		}
+	};
+
+	uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
+
+	population.TrainGenerations(callbacks, 100, 0.7);
 
 	uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
 	std::cout << "Training duration (ms) : " << duration << std::endl;

@@ -13,8 +13,16 @@ class Population
 public:
 	Population(size_t aCount, size_t anInputCount, size_t anOutputCount);
 
-	void TrainOneGeneration(std::function<void()> aEvaluateGenomes, std::function<void()> aGenerateOffsprings);
-	void TrainGenerations(std::function<void()> aEvaluateGenomes, std::function<void()> aGenerateOffsprings, int aMaxGenerationCount, double aSatisfactionThreshold);
+	struct TrainingCallbacks
+	{
+		std::function<void()> myOnTrainGenerationStart;
+		std::function<void()> myOnTrainGenerationEnd; // Exposed for parallelization
+		
+		std::function<void()> myEvaluateGenomes;
+		std::function<void()> myGenerateOffsprings;
+	};
+	void TrainOneGeneration(const TrainingCallbacks& someCallbacks);
+	void TrainGenerations(const TrainingCallbacks& someCallbacks, int aMaxGenerationCount, double aSatisfactionThreshold);
 
 	size_t GetSize() const { return myGenomes.size(); }
 
