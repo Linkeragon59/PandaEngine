@@ -26,6 +26,7 @@ public:
 	static inline double ourSpecieThreshold = 3.0;
 	static inline double ourMatchingGeneCoeff = 0.4;
 	static inline double ourNonMatchingGeneCoeff = 1.0;
+	static inline int ourExtinctionAfterNoImprovement = 10;
 
 private:
 	static std::default_random_engine ourRandomGenerator;

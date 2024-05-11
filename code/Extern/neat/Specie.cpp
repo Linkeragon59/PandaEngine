@@ -43,22 +43,53 @@ bool Specie::BelongsToSpecie(const Genome* aGenome) const
 	if (matchingGenesCount > 0)
 		averageWeightDifference /= matchingGenesCount;
 
-	return EvolutionParams::ourMatchingGeneCoeff * averageWeightDifference + EvolutionParams::ourMatchingGeneCoeff * nonMatchingGenesCount / maxGenomeSize;
+	// TODO : weird choice of params, can't really fail this test...
+	return (EvolutionParams::ourMatchingGeneCoeff * averageWeightDifference
+		+ EvolutionParams::ourNonMatchingGeneCoeff * nonMatchingGenesCount / maxGenomeSize)
+		< EvolutionParams::ourSpecieThreshold;
 }
 
-void Specie::GenerateOffsprings()
+size_t Specie::ComputeNextSize(double anAverageAdjustedFitness)
 {
-	// TODO
-}
+	myNoImprovementCount++;
 
-size_t Specie::ComputeNextSize(double anAverageFitness) const
-{
 	double newSize = 0.0;
 	for (const Genome* genome : myGenomes)
 	{
 		newSize += genome->GetAdjustedFitness();
+		if (genome->GetFitness() > myBestFitness)
+		{
+			myBestFitness = genome->GetFitness();
+			myNoImprovementCount = 0;
+		}
 	}
-	return static_cast<size_t>(std::round(newSize / anAverageFitness));
+
+	// If there was no improvement for many generations, don't generate any offsprings, and go extinct
+	if (myNoImprovementCount > EvolutionParams::ourExtinctionAfterNoImprovement)
+		myNextSize = 0;
+	else
+		myNextSize = static_cast<size_t>(std::round(newSize / anAverageAdjustedFitness));
+
+	return myNextSize;
+}
+
+void Specie::GenerateOffsprings()
+{
+	if (myNextSize == 0)
+		return;
+
+	// TODO
+	// Sort the genomes by fitness,
+	// put a copy of the champion in the offsprings
+	// while we can still generate offsprings, randomly choose if we want only mutation or crossover, and select the parents randomely, weighted by their fitness
+}
+
+void Specie::CollectOffsprings(std::vector<Genome>& someOutOffsprings)
+{
+	someOutOffsprings.reserve(someOutOffsprings.size() + myOffsprings.size());
+	for (Genome& genome : myOffsprings)
+		someOutOffsprings.push_back(std::move(genome));
+	myOffsprings.clear();
 }
 
 }

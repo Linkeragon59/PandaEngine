@@ -27,6 +27,9 @@ public:
 	double GetFitness() const { return myFitness; }
 	double GetAdjustedFitness() const { return myAdjustedFitness; }
 
+	void SetSpecie(Specie* aSpecie) { mySpecie = aSpecie; }
+	Specie* GetSpecie() const { return mySpecie; }
+
 private:
 	size_t GetHiddenNodesCount() const { return myNodes.size() - 1 - myInputCount - myOutputCount; } // -1 for Bias
 	void LinkNodes(size_t aSrcNodeIdx, size_t aDstNodeIdx, double aWeight, bool anEnable);
@@ -43,6 +46,7 @@ private:
 
 	double myFitness = 0.0;
 	double myAdjustedFitness = 0.0;
+
 	Specie* mySpecie = nullptr;
 };
 

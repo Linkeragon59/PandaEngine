@@ -4,9 +4,41 @@ namespace Neat {
 
 Population::Population(size_t aCount, size_t anInputCount, size_t anOutputCount)
 {
+	Genome baseGenome = Genome(anInputCount, anOutputCount);
+
 	myGenomes.reserve(aCount);
 	for (size_t i = 0; i < aCount; ++i)
-		myGenomes.push_back(Genome(anInputCount, anOutputCount));
+		myGenomes.push_back(baseGenome);
+}
+
+void Population::TrainOneGeneration(std::function<void()> aEvaluateGenomes, std::function<void()> aGenerateOffsprings)
+{
+	GroupSpecies();
+
+	aEvaluateGenomes();
+
+	double averageAdjustedFitness = GetAverageAdjustedFitness();
+	for (Neat::Specie& specie : mySpecies)
+	{
+		specie.ComputeNextSize(averageAdjustedFitness);
+	}
+
+	// TODO : Adapt species sizes so the population count remains the same
+
+	aGenerateOffsprings();
+
+	ReplacePopulationWithOffsprings();
+}
+
+void Population::TrainGenerations(std::function<void()> aEvaluateGenomes, std::function<void()> aGenerateOffsprings, int aMaxGenerationCount, double aSatisfactionThreshold)
+{
+	for (int i = 0; i < aMaxGenerationCount; ++i)
+	{
+		TrainOneGeneration(aEvaluateGenomes, aGenerateOffsprings);
+		const Genome* bestGenome = GetBestGenome();
+		if (bestGenome && bestGenome->GetFitness() > aSatisfactionThreshold)
+			break;
+	}
 }
 
 const Genome* Population::GetBestGenome() const
@@ -24,14 +56,74 @@ const Genome* Population::GetBestGenome() const
 	return bestGenome;
 }
 
+double Population::GetAverageAdjustedFitness() const
+{
+	double averageAdjustedFitness = 0.0;
+	if (myGenomes.size() == 0)
+		return averageAdjustedFitness;
+
+	for (const Genome& genome : myGenomes)
+		averageAdjustedFitness += genome.GetAdjustedFitness();
+	return averageAdjustedFitness / myGenomes.size();
+}
+
 void Population::GroupSpecies()
 {
-	// TODO
+	// First remove all the genomes from the species
+	for (Specie& specie : mySpecies)
+	{
+		specie.ClearGenomes();
+	}
+
+	// And group all genomes (offsprings of the previous generation) who already know about their specie
+	for (Genome& genome : myGenomes)
+	{
+		if (Specie* specie = genome.GetSpecie())
+		{
+			specie->AddGenome(&genome);
+		}
+	}
+
+	// Then remove extinct species
+	for (auto it = mySpecies.begin(); it != mySpecies.end();)
+	{
+		if (it->GetSize() == 0)
+		{
+			it = mySpecies.erase(it);
+			continue;
+		}
+		++it;
+	}
+
+	// Finally group the remaining genomes in their species, creating new species as necessary
+	for (Genome& genome : myGenomes)
+	{
+		for (Specie& specie : mySpecies)
+		{
+			if (specie.BelongsToSpecie(&genome))
+			{
+				genome.SetSpecie(&specie);
+				specie.AddGenome(&genome);
+				break;
+			}
+		}
+
+		if (!genome.GetSpecie())
+		{
+			Specie& newSpecie = mySpecies.emplace_back();
+			genome.SetSpecie(&newSpecie);
+			newSpecie.AddGenome(&genome);
+		}
+	}
 }
 
 void Population::ReplacePopulationWithOffsprings()
 {
-	// TODO
+	myGenomes.clear();
+	for (Specie& specie : mySpecies)
+	{
+		specie.CollectOffsprings(myGenomes);
+	}
 }
 
 }

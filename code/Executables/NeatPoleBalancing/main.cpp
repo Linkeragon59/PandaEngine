@@ -227,70 +227,56 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Neat::Population& aPopul
 			}
 
 			uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
-
 			std::cout << i << " : " << duration << std::endl;
 		}
 	});
 }
 
-void TrainNeatOneGeneration(Thread::WorkerPool& aPool, Neat::Population& aPopulation)
-{
-	uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
-
-	aPopulation.GroupSpecies();
-
-	size_t runPerThread = aPopulation.GetSize() / aPool.GetWorkersCount();
-	size_t startIdx = 0;
-	while (startIdx < aPopulation.GetSize())
-	{
-		EvaluatePopulationAsync(aPool, aPopulation, startIdx, startIdx + runPerThread);
-		startIdx = std::min(aPopulation.GetSize(), startIdx + runPerThread);
-	}
-
-	aPool.WaitIdle();
-
-	for (Neat::Specie& specie : aPopulation.GetSpecies())
-	{
-		aPool.RequestJob([&specie]() {
-			specie.GenerateOffsprings();
-		});
-	}
-
-	aPool.WaitIdle();
-
-	aPopulation.ReplacePopulationWithOffsprings();
-
-	uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
-	std::cout << duration << std::endl;
-}
-
 void TrainNeat()
 {
-	std::random_device rd;
-	Neat::EvolutionParams::SetRandomSeed(rd());
-
 	Thread::WorkerPool threadPool(Thread::WorkerPriority::High);
 #if DEBUG_BUILD
-	threadPool.SetWorkersName("Workers");
 	threadPool.SetWorkersCount(1); // Using several threads is slower in Debug...
 #else
 	threadPool.SetWorkersCount();
 #endif
 
+	std::random_device rd;
+	Neat::EvolutionParams::SetRandomSeed(rd());
+
+	uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
+
 	Neat::Population population = Neat::Population(100, 4, 1);
-	const Neat::Genome* bestGenome = nullptr;
+	population.TrainGenerations(
+	[&population, &threadPool]() {
+		size_t runPerThread = population.GetSize() / threadPool.GetWorkersCount();
+		size_t startIdx = 0;
+		while (startIdx < population.GetSize())
+		{
+			EvaluatePopulationAsync(threadPool, population, startIdx, startIdx + runPerThread);
+			startIdx = std::min(population.GetSize(), startIdx + runPerThread);
+		}
+		threadPool.WaitIdle();
+	},
+	[&population, &threadPool] () {
+		for (Neat::Specie& specie : population.GetSpecies())
+		{
+			threadPool.RequestJob([&specie]() {
+				specie.GenerateOffsprings();
+			});
+		}
+		threadPool.WaitIdle();
+	},
+	10, 0.5);
 
-	double fitnessThreshold = 0.5;
-	for (uint i = 0; i < 1; ++i)
+	uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
+	std::cout << "Training duration (ms) : " << duration << std::endl;
+
+	if (const Neat::Genome* bestGenome = population.GetBestGenome())
 	{
-		TrainNeatOneGeneration(threadPool, population);
-		bestGenome = population.GetBestGenome();
-		if (bestGenome && bestGenome->GetFitness() > fitnessThreshold)
-			break;
-	}
-
-	if (bestGenome)
 		bestGenome->SaveToFile("poleBalancing");
+		std::cout << "Best Fitness : " << bestGenome->GetFitness() << std::endl;
+	}
 }
 
 int main()

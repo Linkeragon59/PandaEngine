@@ -1,7 +1,5 @@
 #pragma once
 
-#define _SILENCE_CXX20_CISO646_REMOVED_WARNING
-
 #include "Core_Defines.h"
 #include "Core_Assert.h"
 #include "Core_glm.h"
