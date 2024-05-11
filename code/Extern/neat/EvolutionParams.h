@@ -22,9 +22,10 @@ public:
 
 	static inline double ourSingleParentReproductionProba = 0.25;
 	static inline double ourDisableEdgeOnCrossOverProba = 0.75;
+	static inline double ourAmountGenomesToKeep = 0.3;
 
-	static inline double ourSpecieThreshold = 3.0;
-	static inline double ourMatchingGeneCoeff = 0.4;
+	static inline double ourSpecieThreshold = 1.0;
+	static inline double ourMatchingGeneCoeff = 2.0;
 	static inline double ourNonMatchingGeneCoeff = 1.0;
 	static inline int ourExtinctionAfterNoImprovement = 10;
 

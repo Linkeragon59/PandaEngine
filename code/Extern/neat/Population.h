@@ -12,6 +12,7 @@ class Population
 {
 public:
 	Population(size_t aCount, size_t anInputCount, size_t anOutputCount);
+	~Population();
 
 	struct TrainingCallbacks
 	{
@@ -29,14 +30,14 @@ public:
 	Genome* GetGenome(size_t aGenomeIdx) { return aGenomeIdx < myGenomes.size() ? &myGenomes[aGenomeIdx] : nullptr; }
 	const Genome* GetBestGenome() const;
 
-	std::vector<Specie>& GetSpecies() { return mySpecies; }
+	std::vector<Specie*>& GetSpecies() { return mySpecies; }
 
 private:
 	double GetAverageAdjustedFitness() const;
 	void GroupSpecies();
 	void ReplacePopulationWithOffsprings();
 	std::vector<Genome> myGenomes;
-	std::vector<Specie> mySpecies;
+	std::vector<Specie*> mySpecies;
 };
 
 }

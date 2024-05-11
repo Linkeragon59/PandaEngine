@@ -43,7 +43,6 @@ bool Specie::BelongsToSpecie(const Genome* aGenome) const
 	if (matchingGenesCount > 0)
 		averageWeightDifference /= matchingGenesCount;
 
-	// TODO : weird choice of params, can't really fail this test...
 	return (EvolutionParams::ourMatchingGeneCoeff * averageWeightDifference
 		+ EvolutionParams::ourNonMatchingGeneCoeff * nonMatchingGenesCount / maxGenomeSize)
 		< EvolutionParams::ourSpecieThreshold;
@@ -51,37 +50,44 @@ bool Specie::BelongsToSpecie(const Genome* aGenome) const
 
 size_t Specie::ComputeNextSize(double anAverageAdjustedFitness)
 {
-	myNoImprovementCount++;
-
 	double newSize = 0.0;
+	double bestFitness = 0.0;
 	for (const Genome* genome : myGenomes)
 	{
 		newSize += genome->GetAdjustedFitness();
-		if (genome->GetFitness() > myBestFitness)
-		{
-			myBestFitness = genome->GetFitness();
-			myNoImprovementCount = 0;
-		}
+		if (genome->GetFitness() > bestFitness)
+			bestFitness = genome->GetFitness();
 	}
+
+	if (bestFitness > myBestFitness)
+		myNoImprovementCount = 0;
+	else
+		myNoImprovementCount++;
+	myBestFitness = bestFitness;
 
 	// If there was no improvement for many generations, don't generate any offsprings, and go extinct
 	if (myNoImprovementCount > EvolutionParams::ourExtinctionAfterNoImprovement)
-		myNextSize = 0;
-	else
-		myNextSize = static_cast<size_t>(std::round(newSize / anAverageAdjustedFitness));
-
+		return 0;
+	
+	myNextSize = static_cast<size_t>(std::round(newSize / anAverageAdjustedFitness));
 	return myNextSize;
 }
 
 void Specie::GenerateOffsprings()
 {
-	if (myNextSize == 0 || myGenomes.size() == 0)
+	if (myNextSize == 0)
 		return;
 
 	std::sort(myGenomes.begin(), myGenomes.end(), [](const Genome* aGenome1, const Genome* aGenome2) { return aGenome1->GetFitness() > aGenome2->GetFitness(); });
+	size_t countGenomesToKeep = static_cast<size_t>(std::ceil(EvolutionParams::ourAmountGenomesToKeep * myGenomes.size()));
+	myGenomes.resize(countGenomesToKeep);
+
+	if (myGenomes.size() == 0)
+		return;
 
 	// Copy the best genome as is for the next generation
 	myOffsprings.push_back(Genome(*myGenomes[0]));
+	myNextSize--;
 
 	// Generate as many offsprings as needed
 	// randomly choose if we want only mutation or crossover
@@ -103,7 +109,7 @@ void Specie::GenerateOffsprings()
 		return myGenomes[0];
 	};
 
-	while (--myNextSize > 0)
+	while (myNextSize > 0)
 	{
 		std::uniform_real_distribution<> rand2(0.0, 1.0);
 		if (rand2(EvolutionParams::GetRandomGenerator()) < EvolutionParams::ourSingleParentReproductionProba)
@@ -118,6 +124,7 @@ void Specie::GenerateOffsprings()
 			Genome& offspring = myOffsprings.emplace_back(getWeightedRandomGenome(), getWeightedRandomGenome());
 			offspring.Mutate();
 		}
+		myNextSize--;
 	}
 }
 

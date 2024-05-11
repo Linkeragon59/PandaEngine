@@ -50,6 +50,8 @@ struct PoleBalancingSystem
 
 PoleBalancingSystem::PoleBalancingSystem(double aStartVariance)
 {
+	if (aStartVariance <= 0.0)
+		return;
 	std::normal_distribution<> rand(0.0, aStartVariance);
 	myPoleAngle = rand(Neat::EvolutionParams::GetRandomGenerator()) * 2.0 * PI;
 	myCartPosition = rand(Neat::EvolutionParams::GetRandomGenerator()) * myTrackSize / 2.0;
@@ -104,7 +106,8 @@ void PoleBalancingSystem::Draw()
 	draw_list->AddRectFilled(cartPos - cartSize / 2.f, cartPos + cartSize / 2.f, 0xFFFFFFFF);
 	draw_list->AddLine(cartPos, poleEndPos, 0xFFFF0000, 5.f);
 
-	draw_list->AddText(cartPos + ImVec2(0.f, 50.f), 0xFFFFFFFF, std::format("Angle : {}", GetPoleAngle() * 180.0 / PI).c_str());
+	double angleDegrees = GetPoleAngle() * 180.0 / PI;
+	draw_list->AddText(cartPos + ImVec2(0.f, 50.f), 0xFFFFFFFF, std::format("Angle : {}", angleDegrees).c_str());
 }
 
 class NeatPoleBalancingModule : public Core::Module
@@ -142,7 +145,7 @@ void NeatPoleBalancingModule::OnInitialize()
 	myGui = myGuiEntity.AddComponent<Render::EntityGuiComponent>(myWindow, false);
 	myGui->myCallback = [this]() { OnGuiUpdate(); };
 
-	mySystem = new PoleBalancingSystem(0.1);
+	mySystem = new PoleBalancingSystem(0.0);
 	myNeatGenome = new Neat::Genome("poleBalancing");
 }
 
@@ -215,7 +218,7 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Neat::Population& aPopul
 
 			if (Neat::Genome* genome = aPopulation.GetGenome(i))
 			{
-				PoleBalancingSystem system(0.1);
+				PoleBalancingSystem system(0.0);
 				double fitness = 0.0;
 
 				for (uint t = 0; t < 5000; ++t)
@@ -247,13 +250,14 @@ void TrainNeat()
 {
 	Thread::WorkerPool threadPool(Thread::WorkerPriority::High);
 #if DEBUG_BUILD
-	threadPool.SetWorkersCount(1); // Using several threads is slower in Debug...
+	threadPool.SetWorkersCount(2); // Using several threads is slower in Debug...
 #else
 	threadPool.SetWorkersCount();
 #endif
 
 	std::random_device rd;
 	Neat::EvolutionParams::SetRandomSeed(rd());
+	//Neat::EvolutionParams::ourSpecieThreshold = 9999999.0; // TODO : remove, just for testing with 1 specie
 
 	Neat::Population population = Neat::Population(100, 4, 1);
 	Neat::Population::TrainingCallbacks callbacks;
@@ -270,16 +274,18 @@ void TrainNeat()
 	};
 
 	callbacks.myGenerateOffsprings = [&population, &threadPool]() {
-		for (Neat::Specie& specie : population.GetSpecies())
+		for (Neat::Specie* specie : population.GetSpecies())
 		{
-			threadPool.RequestJob([&specie]() {
-				specie.GenerateOffsprings();
-				});
+			threadPool.RequestJob([specie]() {
+				specie->GenerateOffsprings();
+			});
 		}
 		threadPool.WaitIdle();
 	};
 
 	callbacks.myOnTrainGenerationEnd = [&population]() {
+		std::cout << "Population Size : " << population.GetSize() << std::endl;
+		std::cout << "Species Count : " << population.GetSpecies().size() << std::endl;
 		if (const Neat::Genome* bestGenome = population.GetBestGenome())
 		{
 			std::cout << "Generation Best Fitness : " << bestGenome->GetFitness() << std::endl;

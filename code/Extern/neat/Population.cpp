@@ -11,6 +11,12 @@ Population::Population(size_t aCount, size_t anInputCount, size_t anOutputCount)
 		myGenomes.push_back(baseGenome);
 }
 
+Population::~Population()
+{
+	for (Specie* specie : mySpecies)
+		delete specie;
+}
+
 void Population::TrainOneGeneration(const TrainingCallbacks& someCallbacks)
 {
 	if (someCallbacks.myOnTrainGenerationStart)
@@ -22,12 +28,14 @@ void Population::TrainOneGeneration(const TrainingCallbacks& someCallbacks)
 		someCallbacks.myEvaluateGenomes();
 
 	double averageAdjustedFitness = GetAverageAdjustedFitness();
-	for (Neat::Specie& specie : mySpecies)
+	for (Neat::Specie* specie : mySpecies)
 	{
-		specie.ComputeNextSize(averageAdjustedFitness);
+		specie->ComputeNextSize(averageAdjustedFitness);
 	}
 
 	// TODO : Adapt species sizes so the population count remains the same
+	// Bug 1 : For some reasons currently the population size explodes, even if we set a high specie threshold to have only one specie
+	// Bug 2 : Also not sure why the best fitness can decrease even with no variance in the balancing system...
 
 	if (someCallbacks.myGenerateOffsprings)
 		someCallbacks.myGenerateOffsprings();
@@ -78,9 +86,9 @@ double Population::GetAverageAdjustedFitness() const
 void Population::GroupSpecies()
 {
 	// First remove all the genomes from the species
-	for (Specie& specie : mySpecies)
+	for (Specie* specie : mySpecies)
 	{
-		specie.ClearGenomes();
+		specie->ClearGenomes();
 	}
 
 	// And group all genomes (offsprings of the previous generation) who already know about their specie
@@ -95,8 +103,9 @@ void Population::GroupSpecies()
 	// Then remove extinct species
 	for (auto it = mySpecies.begin(); it != mySpecies.end();)
 	{
-		if (it->GetSize() == 0)
+		if ((*it)->GetSize() == 0)
 		{
+			delete (*it);
 			it = mySpecies.erase(it);
 			continue;
 		}
@@ -106,21 +115,25 @@ void Population::GroupSpecies()
 	// Finally group the remaining genomes in their species, creating new species as necessary
 	for (Genome& genome : myGenomes)
 	{
-		for (Specie& specie : mySpecies)
+		if (genome.GetSpecie())
+			continue;
+
+		for (Specie* specie : mySpecies)
 		{
-			if (specie.BelongsToSpecie(&genome))
+			if (specie->BelongsToSpecie(&genome))
 			{
-				genome.SetSpecie(&specie);
-				specie.AddGenome(&genome);
+				genome.SetSpecie(specie);
+				specie->AddGenome(&genome);
 				break;
 			}
 		}
 
 		if (!genome.GetSpecie())
 		{
-			Specie& newSpecie = mySpecies.emplace_back();
-			genome.SetSpecie(&newSpecie);
-			newSpecie.AddGenome(&genome);
+			Specie* newSpecie = new Specie;
+			genome.SetSpecie(newSpecie);
+			newSpecie->AddGenome(&genome);
+			mySpecies.push_back(newSpecie);
 		}
 	}
 }
@@ -128,9 +141,9 @@ void Population::GroupSpecies()
 void Population::ReplacePopulationWithOffsprings()
 {
 	myGenomes.clear();
-	for (Specie& specie : mySpecies)
+	for (Specie* specie : mySpecies)
 	{
-		specie.CollectOffsprings(myGenomes);
+		specie->CollectOffsprings(myGenomes);
 	}
 }
 
