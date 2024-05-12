@@ -214,8 +214,6 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Neat::Population& aPopul
 	aPool.RequestJob([&aPopulation, aStartIdx, aEndIdx]() {
 		for (size_t i = aStartIdx; i < aEndIdx; ++i)
 		{
-			//uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
-
 			if (Neat::Genome* genome = aPopulation.GetGenome(i))
 			{
 				PoleBalancingSystem system(0.0);
@@ -239,9 +237,6 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Neat::Population& aPopul
 
 				genome->SetFitness(fitness);
 			}
-
-			//uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
-			//std::cout << i << " : " << duration << std::endl;
 		}
 	});
 }
@@ -257,7 +252,10 @@ void TrainNeat()
 
 	std::random_device rd;
 	Neat::EvolutionParams::SetRandomSeed(rd());
-	//Neat::EvolutionParams::ourSpecieThreshold = 9999999.0; // TODO : remove, just for testing with 1 specie
+	Neat::EvolutionParams::ourSpecieThreshold = 9999999.0; // TODO : remove, just for testing with 1 specie
+	Neat::EvolutionParams::ourExtinctionAfterNoImprovement = INT_MAX;
+	//Neat::EvolutionParams::ourNewNodeProba = 0.1;
+	//Neat::EvolutionParams::ourNonMatchingGeneCoeff = 2.0;
 
 	Neat::Population population = Neat::Population(100, 4, 1);
 	Neat::Population::TrainingCallbacks callbacks;
@@ -294,7 +292,7 @@ void TrainNeat()
 
 	uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
 
-	population.TrainGenerations(callbacks, 100, 0.7);
+	population.TrainGenerations(callbacks, 1000, 0.9);
 
 	uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
 	std::cout << "Training duration (ms) : " << duration << std::endl;

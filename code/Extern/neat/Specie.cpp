@@ -66,6 +66,7 @@ size_t Specie::ComputeNextSize(double anAverageAdjustedFitness)
 	myBestFitness = bestFitness;
 
 	// If there was no improvement for many generations, don't generate any offsprings, and go extinct
+	// TODO : Not good, if the best specie don't evolve anymore we just remove our best genomes...
 	if (myNoImprovementCount > EvolutionParams::ourExtinctionAfterNoImprovement)
 		return 0;
 	

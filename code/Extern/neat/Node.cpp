@@ -13,6 +13,7 @@ void Node::Evaluate(const std::vector<Node>& someNodes, const std::map<std::uint
 		myOutputValue = myInputValue;
 		break;
 	default:
+		myInputValue = 0.0;
 		for (std::uint64_t edgeId : myInputEdges)
 		{
 			auto it = someEdges.find(edgeId);
