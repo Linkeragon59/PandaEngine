@@ -108,6 +108,36 @@ int main()
 
 	TrainNeat();
 
+	Neat::Genome genome("neat_xor");
+	{
+		double error = 0.0;
+
+		double xorInputs[4][2] = {
+			{0.0, 0.0},
+			{0.0, 1.0},
+			{1.0, 0.0},
+			{1.0, 1.0}
+		};
+		double xorOutputs[4] = {
+			0.0,
+			1.0,
+			1.0,
+			0.0
+		};
+
+		for (uint j = 0; j < 4; ++j)
+		{
+			std::vector<double> inputs;
+			inputs.push_back(xorInputs[j][0]);
+			inputs.push_back(xorInputs[j][1]);
+			std::vector<double> outputs;
+			genome.Evaluate(inputs, outputs);
+			std::cout << "XOR(" << xorInputs[j][0] << "," << xorInputs[j][1] << ") = " << outputs[0] << " (error: " << std::abs(xorOutputs[j] - outputs[0]) << ")" << std::endl;
+		}
+
+		genome.SetFitness(std::pow(4.0 - error, 2.0)); // [0, 16]}
+	}
+
 	Core::Facade::Destroy();
 
 	return EXIT_SUCCESS;
