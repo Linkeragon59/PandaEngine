@@ -6,6 +6,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <cassert>
 
 namespace Neat {
 
@@ -107,7 +108,9 @@ Genome::Genome(const char* aFilePath)
 			if (tokens.size() != 5)
 				continue;
 
-			LinkNodesWithInnovationId(std::stoull(tokens[1]), std::stoull(tokens[2]), std::stod(tokens[3]), std::stoi(tokens[4]), std::stoull(tokens[0]));
+			std::uint64_t innovationId = std::stoull(tokens[0]);
+			LinkNodesWithInnovationId(std::stoull(tokens[1]), std::stoull(tokens[2]), std::stod(tokens[3]), std::stoi(tokens[4]), innovationId);
+			EvolutionParams::SetNextInnovationNumber(innovationId + 1);
 		}
 	}
 }
@@ -120,11 +123,11 @@ void Genome::SaveToFile(const char* aFilePath) const
 
 	file << myInputCount << ";" << GetHiddenNodesCount() << ";" << myOutputCount << ";" << std::endl;
 
-	for (auto it = myEdges.begin(); it != myEdges.end(); ++it)
+	for (auto it = myLinks.begin(); it != myLinks.end(); ++it)
 	{
-		const Edge& edge = it->second;
-		file << it->first << " " << edge.GetSrcNodeIdx() << " " << edge.GetDstNodeIdx() << " "
-			<< edge.GetWeight() << " " << edge.IsEnabled() << ";" << std::endl;
+		const Link& link = it->second;
+		file << it->first << " " << link.GetSrcNodeIdx() << " " << link.GetDstNodeIdx() << " "
+			<< link.GetWeight() << " " << link.IsEnabled() << ";" << std::endl;
 	}
 }
 
@@ -139,43 +142,24 @@ Genome::Genome(const Genome* aParent1, const Genome* aParent2)
 	for (const Node& node : primaryParent->myNodes)
 		myNodes.push_back(Node(node.GetType()));
 
-	for (auto it = primaryParent->myEdges.begin(); it != primaryParent->myEdges.end(); ++it)
+	for (auto it = primaryParent->myLinks.begin(); it != primaryParent->myLinks.end(); ++it)
 	{
 		std::uint64_t innovationId = it->first;
-		const Edge& primaryParentEdge = it->second;
+		const Link& primaryParentLink = it->second;
 		
-		auto it2 = secondaryParent->myEdges.find(innovationId);
-		if (it2 != secondaryParent->myEdges.end())
+		auto it2 = secondaryParent->myLinks.find(innovationId);
+		if (it2 != secondaryParent->myLinks.end())
 		{
 			// Common gene, choose weight randomly
-			const Edge& secondaryParentEdge = it2->second;
-			
 			std::uniform_int_distribution<> rand(0, 1);
-			double weight = (rand(EvolutionParams::GetRandomGenerator()) == 0) ? primaryParentEdge.GetWeight() : it2->second.GetWeight();
+			double weight = (rand(EvolutionParams::GetRandomGenerator()) == 0) ? primaryParentLink.GetWeight() : it2->second.GetWeight();
 
-			bool edgeEnabled = true;
-			if (!primaryParentEdge.IsEnabled() || !secondaryParentEdge.IsEnabled())
-			{
-				std::uniform_real_distribution<> rand2(0.0, 1.0);
-				if (rand2(EvolutionParams::GetRandomGenerator()) <= EvolutionParams::ourDisableEdgeOnCrossOverProba)
-					edgeEnabled = false;
-			}
-
-			LinkNodesWithInnovationId(primaryParentEdge.GetSrcNodeIdx(), primaryParentEdge.GetDstNodeIdx(), weight, edgeEnabled, innovationId);
+			LinkNodesWithInnovationId(primaryParentLink.GetSrcNodeIdx(), primaryParentLink.GetDstNodeIdx(), weight, primaryParentLink.IsEnabled(), innovationId);
 		}
 		else
 		{
 			// Disjoint or Excess gene, ignore secondary parent
-
-			bool edgeEnabled = true;
-			if (!primaryParentEdge.IsEnabled())
-			{
-				std::uniform_real_distribution<> rand2(0.0, 1.0);
-				if (rand2(EvolutionParams::GetRandomGenerator()) <= EvolutionParams::ourDisableEdgeOnCrossOverProba)
-					edgeEnabled = false;
-			}
-
-			LinkNodesWithInnovationId(primaryParentEdge.GetSrcNodeIdx(), primaryParentEdge.GetDstNodeIdx(), primaryParentEdge.GetWeight(), edgeEnabled, innovationId);
+			LinkNodesWithInnovationId(primaryParentLink.GetSrcNodeIdx(), primaryParentLink.GetDstNodeIdx(), primaryParentLink.GetWeight(), primaryParentLink.IsEnabled(), innovationId);
 		}
 	}
 }
@@ -184,14 +168,16 @@ void Genome::Mutate()
 {
 	std::uniform_real_distribution<> rand(0.0, 1.0);
 
-	if (rand(EvolutionParams::GetRandomGenerator()) <= EvolutionParams::ourEdgeWeightMutationProba)
-		MutateEdgeWeights();
+	if (rand(EvolutionParams::GetRandomGenerator()) <= EvolutionParams::ourLinkWeightMutationProba)
+		MutateLinkWeights();
 
-	if (rand(EvolutionParams::GetRandomGenerator()) <= EvolutionParams::ourNewEdgeProba)
-		MutateAddEdge();
+	if (rand(EvolutionParams::GetRandomGenerator()) <= EvolutionParams::ourNewLinkProba)
+		MutateAddLink();
 
 	if (rand(EvolutionParams::GetRandomGenerator()) <= EvolutionParams::ourNewNodeProba)
 		MutateAddNode();
+
+	//VerifyLinks();
 }
 
 bool Genome::Evaluate(const std::vector<double>& someInputs, std::vector<double>& someOutputs)
@@ -203,12 +189,12 @@ bool Genome::Evaluate(const std::vector<double>& someInputs, std::vector<double>
 	if (myOutputCount == 0)
 		return true;
 
-	myNodes[0].SetInputValue(1);
+	myNodes[0].SetInputValue(1.0);
 	for (size_t i = 0; i < myInputCount; ++i)
 		myNodes[i + 1].SetInputValue(someInputs[i]);
 
 	for (Node& node : myNodes)
-		node.Evaluate(myNodes, myEdges);
+		node.Evaluate(myNodes, myLinks);
 
 	for (size_t i = 0; i < myOutputCount; ++i)
 		someOutputs[i] = myNodes[i + myNodes.size() - myOutputCount].GetOutputValue();
@@ -216,75 +202,96 @@ bool Genome::Evaluate(const std::vector<double>& someInputs, std::vector<double>
 	return true;
 }
 
-void Genome::SetFitness(double aFitness)
-{
-	myFitness = aFitness;
-	myAdjustedFitness = aFitness;
-	if (mySpecie)
-	{
-		myAdjustedFitness /= mySpecie->GetSize();
-	}
-}
-
 void Genome::LinkNodes(size_t aSrcNodeIdx, size_t aDstNodeIdx, double aWeight, bool anEnable)
 {
-	for (auto it = myEdges.begin(); it != myEdges.end(); ++it)
+	for (auto it = myLinks.begin(); it != myLinks.end(); ++it)
 	{
-		Edge& edge = it->second;
-		if (edge.GetSrcNodeIdx() == aSrcNodeIdx && edge.GetDstNodeIdx() == aDstNodeIdx)
+		Link& link = it->second;
+		if (link.GetSrcNodeIdx() == aSrcNodeIdx && link.GetDstNodeIdx() == aDstNodeIdx)
 		{
-			edge.SetWeight(aWeight);
-			edge.SetEnabled(anEnable);
+			link.SetWeight(aWeight);
+			link.SetEnabled(anEnable);
 			return;
 		}
 	}
 	std::uint64_t innovationId = EvolutionParams::GetInnovationNumber();
-	myEdges.insert({innovationId, Edge(aSrcNodeIdx, aDstNodeIdx, aWeight, anEnable)});
-	myNodes[aDstNodeIdx].AddInputEdge(innovationId);
+	myLinks.insert({innovationId, Link(aSrcNodeIdx, aDstNodeIdx, aWeight, anEnable)});
+	myNodes[aDstNodeIdx].AddInputLink(innovationId);
 }
 
 void Genome::LinkNodesWithInnovationId(size_t aSrcNodeIdx, size_t aDstNodeIdx, double aWeight, bool anEnable, std::uint64_t anInnovationId)
 {
-	std::uint64_t innovationId = EvolutionParams::GetInnovationNumber(anInnovationId);
-	myEdges.insert({innovationId,Edge(aSrcNodeIdx, aDstNodeIdx, aWeight, anEnable)});
-	myNodes[aDstNodeIdx].AddInputEdge(innovationId);
+	myLinks.insert({anInnovationId,Link(aSrcNodeIdx, aDstNodeIdx, aWeight, anEnable)});
+	myNodes[aDstNodeIdx].AddInputLink(anInnovationId);
 }
 
-void Genome::MutateEdgeWeights()
+bool Genome::DoNodesHaveDependencies(size_t aSrcNodeIdx, size_t aDstNodeIdx, std::set<size_t>& someCheckedNodes) const
 {
-	for (auto it = myEdges.begin(); it != myEdges.end(); ++it)
+	for (std::uint64_t linkId : myNodes[aDstNodeIdx].GetInputLinks())
 	{
-		Edge& edge = it->second;
+		auto it = myLinks.find(linkId);
+		if (it == myLinks.end())
+			continue;
+
+		size_t srcIdx = it->second.GetSrcNodeIdx();
+		if (srcIdx < aSrcNodeIdx)
+			continue;
+
+		if (someCheckedNodes.contains(srcIdx))
+			continue;
+
+		if (srcIdx == aSrcNodeIdx)
+			return true;
+
+		if (DoNodesHaveDependencies(aSrcNodeIdx, srcIdx, someCheckedNodes))
+			return true;
+
+		someCheckedNodes.insert(srcIdx);
+	}
+	return false;
+}
+
+void Genome::MutateLinkWeights()
+{
+	for (auto it = myLinks.begin(); it != myLinks.end(); ++it)
+	{
+		Link& link = it->second;
 		std::uniform_real_distribution<> rand(0.0, 1.0);
-		if (rand(EvolutionParams::GetRandomGenerator()) <= EvolutionParams::ourEdgeWeightTotalMutationProba)
+		if (rand(EvolutionParams::GetRandomGenerator()) <= EvolutionParams::ourLinkWeightTotalMutationProba)
 		{
 			std::uniform_real_distribution<> rand2(-1.0, 1.0);
-			edge.SetWeight(rand2(EvolutionParams::GetRandomGenerator()));
+			link.SetWeight(rand2(EvolutionParams::GetRandomGenerator()));
 		}
 		else
 		{
-			std::normal_distribution<> rand2(0.0, EvolutionParams::ourEdgeWeightPartialMutationScale);
-			edge.SetWeight(std::clamp(edge.GetWeight() + rand2(EvolutionParams::GetRandomGenerator()), -1.0, 1.0));
+			std::normal_distribution<> rand2(0.0, EvolutionParams::ourLinkWeightPartialMutationScale);
+			link.SetWeight(std::clamp(link.GetWeight() + rand2(EvolutionParams::GetRandomGenerator()), -1.0, 1.0));
 		}
 	}
 }
 
-void Genome::MutateAddEdge()
+void Genome::MutateAddLink()
 {
 	auto getRandomConnectableSrcNodeIdx = [this](size_t aDstNodeIdx) {
 		Node& dstNode = myNodes[aDstNodeIdx];
-		size_t srcIdxBound = std::min(aDstNodeIdx, myNodes.size() - myOutputCount);
-
-		if (dstNode.GetInputEdges().size() >= srcIdxBound)
-			return aDstNodeIdx; // The selected dst node was already fully connected
 
 		std::set<size_t> availableSrcNodeIdx;
-		for (size_t i = 0; i < srcIdxBound; ++i)
+		for (size_t i = 0; i < aDstNodeIdx; ++i)
 			availableSrcNodeIdx.insert(i);
-		for (uint64_t edgeId : dstNode.GetInputEdges())
+		for (size_t i = aDstNodeIdx + 1, e = myNodes.size() - myOutputCount; i < e; ++i)
 		{
-			auto it = myEdges.find(edgeId);
-			if (it != myEdges.end() && it->second.IsEnabled())
+			std::set<size_t> checkedNodes;
+			if (!DoNodesHaveDependencies(aDstNodeIdx, i, checkedNodes))
+				availableSrcNodeIdx.insert(i);
+		}
+
+		if (dstNode.GetInputLinks().size() >= availableSrcNodeIdx.size())
+			return aDstNodeIdx;
+
+		for (uint64_t linkId : dstNode.GetInputLinks())
+		{
+			auto it = myLinks.find(linkId);
+			if (it != myLinks.end() && it->second.IsEnabled())
 				availableSrcNodeIdx.erase(it->second.GetSrcNodeIdx());
 		}
 
@@ -300,44 +307,58 @@ void Genome::MutateAddEdge()
 	if (srcNodeIdx == dstNodeIdx)
 		return;
 
+	if (srcNodeIdx > dstNodeIdx)
+	{
+		// Need to push the dst node later in the execution order, just after the src node
+		myNodes.insert(myNodes.begin() + srcNodeIdx + 1, std::move(myNodes[dstNodeIdx]));
+		myNodes.erase(myNodes.begin() + dstNodeIdx);
+
+		// Node indices changed, so all links have to be updated
+		for (auto it = myLinks.begin(); it != myLinks.end(); ++it)
+			it->second.UpdateAfterNodePush(dstNodeIdx, srcNodeIdx);
+
+		dstNodeIdx = srcNodeIdx;
+		srcNodeIdx--;
+	}
+
 	std::uniform_real_distribution<> rand2(-1.0, 1.0);
 	LinkNodes(srcNodeIdx, dstNodeIdx, rand2(EvolutionParams::GetRandomGenerator()), true);
 }
 
 void Genome::MutateAddNode()
 {
-	auto getRandomSplittableEdge = [this]() -> Edge& {
-		int splittableEdgesCount = 0;
-		for (auto it = myEdges.begin(); it != myEdges.end(); ++it)
+	auto getRandomSplittableLink = [this]() -> Link& {
+		int splittableLinksCount = 0;
+		for (auto it = myLinks.begin(); it != myLinks.end(); ++it)
 		{
 			if (it->second.IsSplittable())
-				splittableEdgesCount++;
+				splittableLinksCount++;
 		}
 
-		std::uniform_int_distribution<> rand(0, splittableEdgesCount - 1);
+		std::uniform_int_distribution<> rand(0, splittableLinksCount - 1);
 
-		int selectedEdgeIdx = rand(EvolutionParams::GetRandomGenerator());
-		int visitedSplittableEdges = -1;
-		for (auto it = myEdges.begin(); it != myEdges.end(); ++it)
+		int selectedLinkIdx = rand(EvolutionParams::GetRandomGenerator());
+		int visitedSplittableLinks = -1;
+		for (auto it = myLinks.begin(); it != myLinks.end(); ++it)
 		{
 			if (it->second.IsSplittable())
-				visitedSplittableEdges++;
+				visitedSplittableLinks++;
 
-			if (visitedSplittableEdges == selectedEdgeIdx)
+			if (visitedSplittableLinks == selectedLinkIdx)
 				return it->second;
 		}
 
 		// Never happens
-		return myEdges.begin()->second;
+		return myLinks.begin()->second;
 	};
-	Edge& edgeToSplit = getRandomSplittableEdge();
+	Link& linkToSplit = getRandomSplittableLink();
 
-	// Disable the edge, but keep it to potential be re-enabled later or participate to cross-overs
-	edgeToSplit.SetEnabled(false);
+	// Disable the link, but keep it to potential be re-enabled later or participate to cross-overs
+	linkToSplit.SetEnabled(false);
 
 	// Insert a new hidden node while keeping the noed vector sorted by execution order
 	size_t newNodeIdx = 0;
-	if (myNodes[edgeToSplit.GetDstNodeIdx()].GetType() == Node::Type::Output)
+	if (myNodes[linkToSplit.GetDstNodeIdx()].GetType() == Node::Type::Output)
 	{
 		// Place the new hidden node just before the outputs
 		newNodeIdx = myNodes.size() - myOutputCount;
@@ -346,17 +367,30 @@ void Genome::MutateAddNode()
 	else
 	{
 		// Place the new hidden node just before the dest node
-		newNodeIdx = edgeToSplit.GetDstNodeIdx();
-		myNodes.insert(myNodes.begin() + edgeToSplit.GetDstNodeIdx(), Node(Node::Type::Hidden));
+		newNodeIdx = linkToSplit.GetDstNodeIdx();
+		myNodes.insert(myNodes.begin() + linkToSplit.GetDstNodeIdx(), Node(Node::Type::Hidden));
 	}
 
-	// Node indices changed, so all edges have to be updated
-	for (auto it = myEdges.begin(); it != myEdges.end(); ++it)
-		it->second.UpdateNodeIdx(newNodeIdx);
+	// Node indices changed, so all links have to be updated
+	for (auto it = myLinks.begin(); it != myLinks.end(); ++it)
+		it->second.UpdateAfterNodeAdd(newNodeIdx);
 
 	LinkNodes(0, newNodeIdx, 0.0, true);
-	LinkNodes(edgeToSplit.GetSrcNodeIdx(), newNodeIdx, 1.0, true);
-	LinkNodes(newNodeIdx, edgeToSplit.GetDstNodeIdx(), edgeToSplit.GetWeight(), true);
+	LinkNodes(linkToSplit.GetSrcNodeIdx(), newNodeIdx, 1.0, true);
+	LinkNodes(newNodeIdx, linkToSplit.GetDstNodeIdx(), linkToSplit.GetWeight(), true);
 }
+
+//void Genome::VerifyLinks() const
+//{
+//	for (size_t idx = 0; idx < myNodes.size(); ++idx)
+//	{
+//		for (std::uint64_t linkId : myNodes[idx].GetInputLinks())
+//		{
+//			auto it = myLinks.find(linkId);
+//			assert(it != myLinks.end());
+//			assert(it->second.GetDstNodeIdx() == idx);
+//		}
+//	}
+//}
 
 }

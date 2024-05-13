@@ -20,7 +20,6 @@ public:
 		std::function<void()> myOnTrainGenerationEnd; // Exposed for parallelization
 		
 		std::function<void()> myEvaluateGenomes;
-		std::function<void()> myGenerateOffsprings;
 	};
 	void TrainOneGeneration(const TrainingCallbacks& someCallbacks);
 	void TrainGenerations(const TrainingCallbacks& someCallbacks, int aMaxGenerationCount, double aSatisfactionThreshold);

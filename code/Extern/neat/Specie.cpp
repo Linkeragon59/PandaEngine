@@ -12,26 +12,22 @@ bool Specie::BelongsToSpecie(const Genome* aGenome) const
 
 	std::uniform_int_distribution<> rand(0, (int)myGenomes.size() - 1);
 	const Genome* representativeGenome = myGenomes[rand(EvolutionParams::GetRandomGenerator())];
-
-	size_t maxGenomeSize = std::max(representativeGenome->GetEdges().size(), aGenome->GetEdges().size());
-	if (maxGenomeSize == 0)
-		return false;
 	
 	size_t matchingGenesCount = 0;
 	size_t nonMatchingGenesCount = 0;
 	double averageWeightDifference = 0.0;
 
-	for (auto it = representativeGenome->GetEdges().begin(); it != representativeGenome->GetEdges().end(); ++it)
+	for (auto it = representativeGenome->GetLinks().begin(); it != representativeGenome->GetLinks().end(); ++it)
 	{
 		std::uint64_t innovationId = it->first;
-		const Edge& representativeEdge = it->second;
+		const Link& representativeLink = it->second;
 
-		auto it2 = aGenome->GetEdges().find(innovationId);
-		if (it2 != aGenome->GetEdges().end())
+		auto it2 = aGenome->GetLinks().find(innovationId);
+		if (it2 != aGenome->GetLinks().end())
 		{
 			// Common gene
 			matchingGenesCount++;
-			averageWeightDifference += std::abs(representativeEdge.GetWeight() - it2->second.GetWeight());
+			averageWeightDifference += std::abs(representativeLink.GetWeight() - it2->second.GetWeight());
 		}
 		else
 		{
@@ -44,34 +40,49 @@ bool Specie::BelongsToSpecie(const Genome* aGenome) const
 		averageWeightDifference /= matchingGenesCount;
 
 	return (EvolutionParams::ourMatchingGeneCoeff * averageWeightDifference
-		+ EvolutionParams::ourNonMatchingGeneCoeff * nonMatchingGenesCount / maxGenomeSize)
+		+ EvolutionParams::ourNonMatchingGeneCoeff * nonMatchingGenesCount) // TODO : Note the original paper divides by the genes count
 		< EvolutionParams::ourSpecieThreshold;
 }
 
-size_t Specie::ComputeNextSize(double anAverageAdjustedFitness)
+void Specie::ComputeBestFitness()
 {
-	double newSize = 0.0;
-	double bestFitness = 0.0;
-	for (const Genome* genome : myGenomes)
+	std::sort(myGenomes.begin(), myGenomes.end(), [](const Genome* aGenome1, const Genome* aGenome2) { return aGenome1->GetFitness() > aGenome2->GetFitness(); });
+	if (myGenomes.size() > 0)
+		myBestFitness = (*myGenomes.begin())->GetFitness();
+}
+
+void Specie::PostEvaluation()
+{
+	std::sort(myGenomes.begin(), myGenomes.end(), [](const Genome* aGenome1, const Genome* aGenome2) { return aGenome1->GetFitness() > aGenome2->GetFitness(); });
+	if (myGenomes.size() > 0)
+		myBestFitness = (*myGenomes.begin())->GetFitness();
+
+	if (myBestFitness > myFitnessRecord)
 	{
-		newSize += genome->GetAdjustedFitness();
-		if (genome->GetFitness() > bestFitness)
-			bestFitness = genome->GetFitness();
+		myFitnessRecord = myBestFitness;
+		myLastImprovementAge = myAge;
 	}
 
-	if (bestFitness > myBestFitness)
-		myNoImprovementCount = 0;
-	else
-		myNoImprovementCount++;
-	myBestFitness = bestFitness;
+	if (IsStagnant())
+		GoExtinct();
+}
 
-	// If there was no improvement for many generations, don't generate any offsprings, and go extinct
-	// TODO : Not good, if the best specie don't evolve anymore we just remove our best genomes...
-	if (myNoImprovementCount > EvolutionParams::ourExtinctionAfterNoImprovement)
-		return 0;
-	
-	myNextSize = static_cast<size_t>(std::round(newSize / anAverageAdjustedFitness));
-	return myNextSize;
+void Specie::AdjustFitness()
+{
+	for (Genome* genome : myGenomes)
+	{
+		double adjustedFitness = genome->GetFitness();
+
+		if (myGoExctinct)
+			adjustedFitness *= 0.01; // TODO : Should be a parameter
+
+		if (IsNew())
+			adjustedFitness *= 1.0; // TODO : Should be a parameter
+
+		adjustedFitness /= myGenomes.size();
+
+		genome->AdjustFitness(adjustedFitness);
+	}
 }
 
 void Specie::GenerateOffsprings()
@@ -79,7 +90,6 @@ void Specie::GenerateOffsprings()
 	if (myNextSize == 0)
 		return;
 
-	std::sort(myGenomes.begin(), myGenomes.end(), [](const Genome* aGenome1, const Genome* aGenome2) { return aGenome1->GetFitness() > aGenome2->GetFitness(); });
 	size_t countGenomesToKeep = static_cast<size_t>(std::ceil(EvolutionParams::ourAmountGenomesToKeep * myGenomes.size()));
 	myGenomes.resize(countGenomesToKeep);
 

@@ -3,12 +3,12 @@ cmake_minimum_required(VERSION 3.16)
 add_library(NEAT)
 target_sources(NEAT
 	PRIVATE
-		Edge.h
-		Edge.cpp
 		EvolutionParams.h
 		EvolutionParams.cpp
 		Genome.h
 		Genome.cpp
+		Link.h
+		Link.cpp
 		Node.h
 		Node.cpp
 		Population.h

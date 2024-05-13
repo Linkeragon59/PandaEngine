@@ -1,4 +1,5 @@
 #include "Population.h"
+#include <algorithm>
 
 namespace Neat {
 
@@ -8,7 +9,12 @@ Population::Population(size_t aCount, size_t anInputCount, size_t anOutputCount)
 
 	myGenomes.reserve(aCount);
 	for (size_t i = 0; i < aCount; ++i)
-		myGenomes.push_back(baseGenome);
+	{
+		Genome& genome = myGenomes.emplace_back(baseGenome);
+		genome.Mutate();
+	}
+
+	GroupSpecies();
 }
 
 Population::~Population()
@@ -22,23 +28,36 @@ void Population::TrainOneGeneration(const TrainingCallbacks& someCallbacks)
 	if (someCallbacks.myOnTrainGenerationStart)
 		someCallbacks.myOnTrainGenerationStart();
 
-	GroupSpecies();
-
 	if (someCallbacks.myEvaluateGenomes)
 		someCallbacks.myEvaluateGenomes();
 
-	double averageAdjustedFitness = GetAverageAdjustedFitness();
+	for (Neat::Specie* specie : mySpecies)
+		specie->ComputeBestFitness();
+
+	std::sort(mySpecies.begin(), mySpecies.end(), [](const Specie* aSpecie1, const Specie* aSpecie2) { return aSpecie1->GetBestFitness() > aSpecie2->GetBestFitness(); });
+
+	// The least performing old specie will go extinct
+	for (size_t i = mySpecies.size() - 1; i >= 0; --i)
+	{
+		if (mySpecies[i]->IsOld())
+		{
+			mySpecies[i]->GoExtinct();
+			break;
+		}
+	}
+
 	for (Neat::Specie* specie : mySpecies)
 	{
-		specie->ComputeNextSize(averageAdjustedFitness);
+		specie->AdjustFitness();
 	}
 
 	// TODO : Adapt species sizes so the population count remains the same
 	// Bug : Not sure why the best fitness can decrease even with no variance in the balancing system...
 	// Problem : Mutations adding topology complexity are not protected at all? They should go into their own specie and be protected...
-
-	if (someCallbacks.myGenerateOffsprings)
-		someCallbacks.myGenerateOffsprings();
+	for (Neat::Specie* specie : mySpecies)
+	{
+		specie->GenerateOffsprings();
+	}
 
 	ReplacePopulationWithOffsprings();
 
@@ -74,10 +93,10 @@ const Genome* Population::GetBestGenome() const
 
 double Population::GetAverageAdjustedFitness() const
 {
-	double averageAdjustedFitness = 0.0;
 	if (myGenomes.size() == 0)
-		return averageAdjustedFitness;
+		return 0.0;
 
+	double averageAdjustedFitness = 0.0;
 	for (const Genome& genome : myGenomes)
 		averageAdjustedFitness += genome.GetAdjustedFitness();
 	return averageAdjustedFitness / myGenomes.size();
@@ -85,38 +104,11 @@ double Population::GetAverageAdjustedFitness() const
 
 void Population::GroupSpecies()
 {
-	// First remove all the genomes from the species
-	for (Specie* specie : mySpecies)
-	{
-		specie->ClearGenomes();
-	}
+	mySpecies.clear();
 
-	// And group all genomes (offsprings of the previous generation) who already know about their specie
 	for (Genome& genome : myGenomes)
 	{
-		if (Specie* specie = genome.GetSpecie())
-		{
-			specie->AddGenome(&genome);
-		}
-	}
-
-	// Then remove extinct species
-	for (auto it = mySpecies.begin(); it != mySpecies.end();)
-	{
-		if ((*it)->GetSize() == 0)
-		{
-			delete (*it);
-			it = mySpecies.erase(it);
-			continue;
-		}
-		++it;
-	}
-
-	// Finally group the remaining genomes in their species, creating new species as necessary
-	for (Genome& genome : myGenomes)
-	{
-		if (genome.GetSpecie())
-			continue;
+		genome.SetSpecie(nullptr);
 
 		for (Specie* specie : mySpecies)
 		{

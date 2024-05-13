@@ -7,10 +7,10 @@ namespace Neat {
 
 class Node;
 
-class Edge
+class Link
 {
 public:
-	Edge(size_t anSrcNodeIdx, size_t anDstNodeIdx, double aWeight, bool anEnable)
+	Link(size_t anSrcNodeIdx, size_t anDstNodeIdx, double aWeight, bool anEnable)
 		: mySrcNodeIdx(anSrcNodeIdx)
 		, myDstNodeIdx(anDstNodeIdx)
 		, myWeight(aWeight)
@@ -24,11 +24,15 @@ public:
 
 	bool IsSplittable() const;
 
-	void UpdateNodeIdx(size_t aNewNodeIdx);
+	void UpdateAfterNodeAdd(size_t aNewNodeIdx);
+	void UpdateAfterNodePush(size_t anOldNodeIdx, size_t aNewNodeIdx);
 	void SetWeight(double aWeight) { myWeight = aWeight; }
 	void SetEnabled(bool aEnable) { myEnabled = aEnable; }
 
 private:
+	void UpdateIdxAfterNodeAdd(size_t& aInOutNodeIdx, size_t aNewNodeIdx);
+	void UpdateIdxAfterNodePush(size_t& aInOutNodeIdx, size_t anOldNodeIdx, size_t aNewNodeIdx);
+
 	size_t mySrcNodeIdx;
 	size_t myDstNodeIdx;
 	double myWeight;

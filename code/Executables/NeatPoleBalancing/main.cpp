@@ -250,8 +250,8 @@ void TrainNeat()
 	threadPool.SetWorkersCount();
 #endif
 
-	std::random_device rd;
-	Neat::EvolutionParams::SetRandomSeed(rd());
+	//std::random_device rd;
+	//Neat::EvolutionParams::SetRandomSeed(rd());
 	Neat::EvolutionParams::ourSpecieThreshold = 9999999.0; // TODO : remove, just for testing with 1 specie
 	Neat::EvolutionParams::ourExtinctionAfterNoImprovement = INT_MAX;
 	//Neat::EvolutionParams::ourNewNodeProba = 0.1;
@@ -292,7 +292,7 @@ void TrainNeat()
 
 	uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
 
-	population.TrainGenerations(callbacks, 1000, 0.9);
+	population.TrainGenerations(callbacks, 10, 0.9);
 
 	uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
 	std::cout << "Training duration (ms) : " << duration << std::endl;
