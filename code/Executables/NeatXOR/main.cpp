@@ -60,7 +60,6 @@ void TrainNeat()
 
 	std::random_device rd;
 	Neat::EvolutionParams::SetRandomSeed(rd());
-	Neat::EvolutionParams::ourExtinctionAfterNoImprovement = INT_MAX;
 
 	Neat::Population population = Neat::Population(150, 2, 1);
 	Neat::Population::TrainingCallbacks callbacks;
@@ -76,13 +75,15 @@ void TrainNeat()
 		threadPool.WaitIdle();
 	};
 
-	callbacks.myOnTrainGenerationEnd = [&population]() {
+	int generationIdx = 0;
+	callbacks.myOnTrainGenerationEnd = [&population, &generationIdx]() {
 		std::cout << "Population Size : " << population.GetSize() << std::endl;
 		std::cout << "Species Count : " << population.GetSpecies().size() << std::endl;
 		if (const Neat::Genome* bestGenome = population.GetBestGenome())
 		{
-			std::cout << "Generation Best Fitness : " << bestGenome->GetFitness() << std::endl;
+			std::cout << "Generation " << generationIdx << ": Best Fitness : " << bestGenome->GetFitness() << std::endl;
 		}
+		generationIdx++;
 	};
 
 	uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();

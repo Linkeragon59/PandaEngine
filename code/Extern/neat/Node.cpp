@@ -8,8 +8,8 @@ namespace {
 	double fsigmoid(double anInput)
 	{
 		static const double slope = 4.924273;
-		static const double constant = 2.4621365;
-		return 1.0 / (1.0 + std::exp(-anInput * slope + constant));
+		static const double constant = 0.0; // 2.4621365;
+		return 1.0 / (1.0 + std::exp(-(anInput * slope + constant)));
 	}
 }
 

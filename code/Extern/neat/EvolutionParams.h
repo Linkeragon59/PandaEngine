@@ -15,7 +15,7 @@ public:
 
 	static inline double ourLinkWeightMutationProba = 0.8;
 	static inline double ourLinkWeightTotalMutationProba = 0.1;
-	static inline double ourLinkWeightPartialMutationScale = 0.05;
+	static inline double ourLinkWeightPartialMutationScale = 2.5;
 
 	static inline double ourNewLinkProba = 0.05;
 	static inline double ourNewNodeProba = 0.03;

@@ -23,6 +23,9 @@ public:
 
 	const std::map<std::uint64_t, Link>& GetLinks() const { return myLinks; }
 
+	size_t GetNodesCount() const { return myNodes.size(); }
+	size_t GetGenesCount() const { return myLinks.size(); }
+
 	bool Evaluate(const std::vector<double>& someInputs, std::vector<double>& someOutputs);
 	void SetFitness(double aFitness) { myFitness = aFitness; }
 	double GetFitness() const { return myFitness; }
