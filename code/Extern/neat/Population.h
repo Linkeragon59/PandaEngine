@@ -31,7 +31,7 @@ public:
 
 	std::vector<Specie*>& GetSpecies() { return mySpecies; }
 
-	bool IsStagnant() const { return myGeneration - myLastImprovementGeneration > 20; } // TODO : Should be a parameter
+	bool IsStagnant() const;
 
 private:
 	double GetAverageAdjustedFitness() const;

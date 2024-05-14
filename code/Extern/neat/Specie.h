@@ -26,9 +26,9 @@ public:
 	void GenerateOffsprings();
 	void CollectOffsprings(std::vector<Genome>& someOutOffsprings);
 
-	bool IsNew() const { return myAge <= 10; } // TODO : Should be a parameter
-	bool IsOld() const { return myAge > 20; } // TODO : Should be a parameter
-	bool IsStagnant() const { return myAge - myLastImprovementAge > 15; } // TODO : Should be a parameter
+	bool IsNew() const;
+	bool IsOld() const;
+	bool IsStagnant() const;
 	void ShouldExtinct() { myShouldExctinct = true; }
 	void Age() { myAge++; }
 

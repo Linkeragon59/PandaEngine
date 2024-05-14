@@ -74,10 +74,10 @@ void Specie::AdjustFitness()
 		double adjustedFitness = genome->GetFitness();
 
 		if (myShouldExctinct || IsStagnant())
-			adjustedFitness *= 0.01; // TODO : Should be a parameter
+			adjustedFitness *= EvolutionParams::ourSpecieStagnantPenality;
 
 		if (IsNew())
-			adjustedFitness *= 1.0; // TODO : Should be a parameter
+			adjustedFitness *= EvolutionParams::ourSpecieNewBonus;
 
 		adjustedFitness /= myGenomes.size();
 
@@ -106,6 +106,7 @@ void Specie::GenerateOffsprings()
 		return;
 
 	size_t countGenomesToMate = static_cast<size_t>(std::ceil(EvolutionParams::ourAmountGenomesToKeep * myGenomes.size()));
+	myGenomes.resize(countGenomesToMate);
 
 	if (countGenomesToMate == 0)
 		return;
@@ -159,6 +160,21 @@ void Specie::CollectOffsprings(std::vector<Genome>& someOutOffsprings)
 	for (Genome& genome : myOffsprings)
 		someOutOffsprings.push_back(std::move(genome));
 	myOffsprings.clear();
+}
+
+bool Specie::IsNew() const
+{
+	return myAge <= EvolutionParams::ourSpecieNewThreshold;
+}
+
+bool Specie::IsOld() const
+{
+	return myAge > EvolutionParams::ourSpecieOldThreshold;
+}
+
+bool Specie::IsStagnant() const
+{
+	return myAge - myLastImprovementAge > EvolutionParams::ourSpecieStagnantThreshold;
 }
 
 }

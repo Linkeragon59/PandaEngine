@@ -39,7 +39,7 @@ Genome::Genome(size_t anInputCount, size_t anOutputCount)
 	: myInputCount(anInputCount)
 	, myOutputCount(anOutputCount)
 {
-	std::uniform_real_distribution<> rand(-8.0, 8.0);
+	std::uniform_real_distribution<> rand(-EvolutionParams::ourLinkWeightBound, EvolutionParams::ourLinkWeightBound);
 
 	myNodes.reserve(1 + myInputCount + myOutputCount); // +1 for Bias
 	myNodes.push_back(Node::Type::Bias);
@@ -259,13 +259,13 @@ void Genome::MutateLinkWeights()
 		std::uniform_real_distribution<> rand(0.0, 1.0);
 		if (rand(EvolutionParams::GetRandomGenerator()) <= EvolutionParams::ourLinkWeightTotalMutationProba)
 		{
-			std::uniform_real_distribution<> rand2(-8.0, 8.0);
+			std::uniform_real_distribution<> rand2(-EvolutionParams::ourLinkWeightBound, EvolutionParams::ourLinkWeightBound);
 			link.SetWeight(rand2(EvolutionParams::GetRandomGenerator()));
 		}
 		else
 		{
-			std::normal_distribution<> rand2(0.0, EvolutionParams::ourLinkWeightPartialMutationScale);
-			link.SetWeight(std::clamp(link.GetWeight() + rand2(EvolutionParams::GetRandomGenerator()), -8.0, 8.0));
+			std::normal_distribution<> rand2(0.0, EvolutionParams::ourLinkWeightPartialMutationPower);
+			link.SetWeight(std::clamp(link.GetWeight() + rand2(EvolutionParams::GetRandomGenerator()), -EvolutionParams::ourLinkWeightBound, EvolutionParams::ourLinkWeightBound));
 		}
 	}
 }
@@ -321,7 +321,7 @@ void Genome::MutateAddLink()
 		srcNodeIdx--;
 	}
 
-	std::uniform_real_distribution<> rand2(-8.0, 8.0);
+	std::uniform_real_distribution<> rand2(-EvolutionParams::ourLinkWeightBound, EvolutionParams::ourLinkWeightBound);
 	LinkNodes(srcNodeIdx, dstNodeIdx, rand2(EvolutionParams::GetRandomGenerator()), true);
 }
 

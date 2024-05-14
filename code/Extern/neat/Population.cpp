@@ -1,4 +1,7 @@
 #include "Population.h"
+
+#include "EvolutionParams.h"
+
 #include <algorithm>
 
 namespace Neat {
@@ -127,6 +130,11 @@ const Genome* Population::GetBestGenome() const
 		}
 	}
 	return bestGenome;
+}
+
+bool Population::IsStagnant() const
+{
+	return myGeneration - myLastImprovementGeneration > EvolutionParams::ourPopulationStagnantThreshold;
 }
 
 double Population::GetAverageAdjustedFitness() const

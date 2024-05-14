@@ -60,6 +60,8 @@ void TrainNeat()
 
 	std::random_device rd;
 	Neat::EvolutionParams::SetRandomSeed(rd());
+	//Neat::EvolutionParams::ourLinkWeightPartialMutationScale = 0.05;
+	//Neat::EvolutionParams::ourLinkWeightBound = 1.0;
 
 	Neat::Population population = Neat::Population(150, 2, 1);
 	Neat::Population::TrainingCallbacks callbacks;

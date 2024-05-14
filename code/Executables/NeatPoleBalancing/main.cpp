@@ -252,12 +252,8 @@ void TrainNeat()
 
 	std::random_device rd;
 	Neat::EvolutionParams::SetRandomSeed(rd());
-	//Neat::EvolutionParams::ourSpecieThreshold = 9999999.0; // TODO : remove, just for testing with 1 specie
-	//Neat::EvolutionParams::ourExtinctionAfterNoImprovement = INT_MAX;
-	//Neat::EvolutionParams::ourNewNodeProba = 0.1;
-	//Neat::EvolutionParams::ourNonMatchingGeneCoeff = 2.0;
 
-	Neat::Population population = Neat::Population(200, 4, 1);
+	Neat::Population population = Neat::Population(100, 4, 1);
 	Neat::Population::TrainingCallbacks callbacks;
 
 	callbacks.myEvaluateGenomes = [&population, &threadPool]() {
@@ -282,7 +278,7 @@ void TrainNeat()
 
 	uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
 
-	population.TrainGenerations(callbacks, 1000, 0.99);
+	population.TrainGenerations(callbacks, 100, 0.9);
 
 	uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
 	std::cout << "Training duration (ms) : " << duration << std::endl;
