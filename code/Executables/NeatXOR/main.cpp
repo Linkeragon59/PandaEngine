@@ -59,9 +59,8 @@ void TrainNeat()
 #endif
 
 	std::random_device rd;
-	Neat::EvolutionParams::SetRandomSeed(rd());
-	//Neat::EvolutionParams::ourLinkWeightPartialMutationScale = 0.05;
-	//Neat::EvolutionParams::ourLinkWeightBound = 1.0;
+	unsigned int seed = rd();
+	Neat::EvolutionParams::SetRandomSeed(seed);
 
 	Neat::Population population = Neat::Population(150, 2, 1);
 	Neat::Population::TrainingCallbacks callbacks;
@@ -79,6 +78,7 @@ void TrainNeat()
 
 	int generationIdx = 0;
 	callbacks.myOnTrainGenerationEnd = [&population, &generationIdx]() {
+		population.Check();
 		std::cout << "Population Size : " << population.GetSize() << std::endl;
 		std::cout << "Species Count : " << population.GetSpecies().size() << std::endl;
 		if (const Neat::Genome* bestGenome = population.GetBestGenome())

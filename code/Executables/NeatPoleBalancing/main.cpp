@@ -23,64 +23,87 @@
 
 struct PoleBalancingSystem
 {
-	PoleBalancingSystem(double aStartVariance);
+	PoleBalancingSystem(bool aRandomizeStart);
+	void Reset();
 
 	void Update(double aForce, double aDeltaTime);
 	double GetPoleAngle() const { return std::atan2(std::sin(myPoleAngle), std::cos(myPoleAngle)); }
 	bool IsPoleUp() const { return std::abs(GetPoleAngle()) <= myPoleFailureAngle; }
 	void Draw();
 
+	double myInitPoleAngle = PI;
+	double myInitPoleVelocity = 0.0;
+	double myInitCartPosition = 0.0;
+	double myInitCartVelocity = 0.0;
+
 	double myPoleAngle = 0.0;
 	double myPoleVelocity = 0.0;
 	double myPoleAcceleration = 0.0;
 	double myPoleMass = 0.1;
-	double myPoleLength = 0.5;
+	double myPoleLength = 0.5; // Half
+	double myPoleFailureAngle = 0.2094384;
+	double myPoleFriction = 0.0;
 
 	double myCartPosition = 0.0;
 	double myCartVelocity = 0.0;
 	double myCartAcceleration = 0.0;
 	double myCartMass = 1.0;
+	double myCartTrackSize = 2.4; // Half
+	double myCartFriction = 0.0;
 
 	double myGravitationalAcceleration = 9.81;
-	double myCartForce = 5.0;
-	double myTrackSize = 4.8;
-	double myPoleFailureAngle = 0.209;
-	double myPoleFriction = 0.1;
+	double myInputForce = 10.0;
 };
 
-PoleBalancingSystem::PoleBalancingSystem(double aStartVariance)
+PoleBalancingSystem::PoleBalancingSystem(bool aRandomizeStart)
 {
-	if (aStartVariance <= 0.0)
-		return;
-	std::normal_distribution<> rand(0.0, aStartVariance);
-	myPoleAngle = rand(Neat::EvolutionParams::GetRandomGenerator()) * 2.0 * PI;
-	myCartPosition = rand(Neat::EvolutionParams::GetRandomGenerator()) * myTrackSize / 2.0;
+	if (aRandomizeStart)
+	{
+		std::uniform_real_distribution<> rand(-1.0, 1.0);
+		myInitPoleAngle = rand(Neat::EvolutionParams::GetRandomGenerator()) * PI;
+		myInitPoleVelocity = rand(Neat::EvolutionParams::GetRandomGenerator()) * 3.0;
+		myInitCartPosition = rand(Neat::EvolutionParams::GetRandomGenerator()) * myCartTrackSize;
+		myInitCartVelocity = rand(Neat::EvolutionParams::GetRandomGenerator()) * 3.0;
+	}
+	Reset();
+}
+
+void PoleBalancingSystem::Reset()
+{
+	myPoleAngle = myInitPoleAngle;
+	myPoleVelocity = myInitPoleVelocity;
+	myCartPosition = myInitCartPosition;
+	myCartVelocity = myInitCartVelocity;
 }
 
 void PoleBalancingSystem::Update(double aForceAmplitude, double aDeltaTime)
 {
 	double sinAngle = std::sin(myPoleAngle);
 	double cosAngle = std::cos(myPoleAngle);
-	double force = aForceAmplitude * myCartForce;
+	double force = aForceAmplitude * myInputForce;
 
-	myPoleAcceleration = (myGravitationalAcceleration * sinAngle + cosAngle * ((-force - myPoleMass * myPoleLength * myPoleVelocity * myPoleVelocity * sinAngle) / (myCartMass + myPoleMass)))
-		/ (myPoleLength * (4.0 / 3.0 - myPoleMass * cosAngle * cosAngle / (myCartMass + myPoleMass)));
+	if (force > 0.0 && myCartPosition >= myCartTrackSize)
+		force = 0.0;
+	else if (force < 0.0 && myCartPosition <= -myCartTrackSize)
+		force = 0.0;
+
+	double tmp = (force + myPoleMass * myPoleLength * myPoleVelocity * myPoleVelocity * sinAngle) / (myCartMass + myPoleMass);
+
+	myPoleAcceleration = (myGravitationalAcceleration * sinAngle - cosAngle * tmp) / (myPoleLength * (4.0 / 3.0 - myPoleMass * cosAngle * cosAngle / (myCartMass + myPoleMass)));
 	myPoleAcceleration -= myPoleVelocity * myPoleFriction;
 
-	myCartAcceleration = (force + myPoleMass * myPoleLength * (myPoleVelocity * myPoleVelocity * sinAngle - myPoleAcceleration * cosAngle))
-		/ (myCartMass + myPoleMass);
-
+	myCartAcceleration = tmp - myPoleMass * myPoleLength * myPoleVelocity * myPoleAcceleration * cosAngle / (myCartMass + myPoleMass);
+	myCartAcceleration -= myCartVelocity * myCartFriction;
+	
 	myPoleVelocity += aDeltaTime * myPoleAcceleration;
 	myPoleAngle += aDeltaTime * myPoleVelocity;
 
 	myCartVelocity += aDeltaTime * myCartAcceleration;
-	myCartPosition += aDeltaTime * myCartVelocity;
-
-	if (std::abs(myCartPosition) > myTrackSize / 2.0)
-	{
+	if (myCartVelocity > 0.0 && myCartPosition >= myCartTrackSize)
 		myCartVelocity = 0.0;
-		myCartPosition = (myCartPosition > 0.0 ? myTrackSize : -myTrackSize) / 2.0;
-	}
+	else if (myCartVelocity < 0.0 && myCartPosition <= -myCartTrackSize)
+		myCartVelocity = 0.0;
+	myCartPosition += aDeltaTime * myCartVelocity;
 }
 
 void PoleBalancingSystem::Draw()
@@ -90,7 +113,7 @@ void PoleBalancingSystem::Draw()
 	ImVec2 size = ImGui::GetContentRegionAvail();
 	ImVec2 pos = ImGui::GetCursorScreenPos();
 
-	ImVec2 trackSize = ImVec2(size.x * static_cast<float>(myTrackSize / windowWidthPhysical), 20.f);
+	ImVec2 trackSize = ImVec2(size.x * static_cast<float>(2.0 * myCartTrackSize / windowWidthPhysical), 20.f);
 	ImVec2 trackPos = pos + ImVec2(size.x / 2.f, size.y / 2.f);
 
 	ImVec2 cartSize = ImVec2(50.f, 30.f);
@@ -107,7 +130,10 @@ void PoleBalancingSystem::Draw()
 	draw_list->AddLine(cartPos, poleEndPos, 0xFFFF0000, 5.f);
 
 	double angleDegrees = GetPoleAngle() * 180.0 / PI;
-	draw_list->AddText(cartPos + ImVec2(0.f, 50.f), 0xFFFFFFFF, std::format("Angle : {}", angleDegrees).c_str());
+	draw_list->AddText(trackPos + ImVec2(0.f, 50.f), 0xFFFFFFFF, std::format("Angle : {}", angleDegrees).c_str());
+	draw_list->AddText(trackPos + ImVec2(0.f, 75.f), 0xFFFFFFFF, std::format("Position : {}", myCartPosition).c_str());
+	draw_list->AddText(trackPos + ImVec2(0.f, 100.f), 0xFFFFFFFF, std::format("Pole Velocity : {}", myPoleVelocity).c_str());
+	draw_list->AddText(trackPos + ImVec2(0.f, 125.f), 0xFFFFFFFF, std::format("Cart Velocity : {}", myCartVelocity).c_str());
 }
 
 class NeatPoleBalancingModule : public Core::Module
@@ -145,7 +171,7 @@ void NeatPoleBalancingModule::OnInitialize()
 	myGui = myGuiEntity.AddComponent<Render::EntityGuiComponent>(myWindow, false);
 	myGui->myCallback = [this]() { OnGuiUpdate(); };
 
-	mySystem = new PoleBalancingSystem(0.0);
+	mySystem = new PoleBalancingSystem(false);
 	myNeatGenome = new Neat::Genome("poleBalancing");
 }
 
@@ -185,7 +211,10 @@ void NeatPoleBalancingModule::OnUpdate(Core::Module::UpdateType aType)
 			std::vector<double> outputs;
 			myNeatGenome->Evaluate(inputs, outputs);
 
-			mySystem->Update(outputs[0], Core::TimeModule::GetInstance()->GetDeltaTimeSec());
+			double force = 1.0;
+			if (outputs[0] < outputs[1])
+				force = -1.0;
+			mySystem->Update(force, Core::TimeModule::GetInstance()->GetDeltaTimeSec());
 		}
 		else
 		{
@@ -216,10 +245,13 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Neat::Population& aPopul
 		{
 			if (Neat::Genome* genome = aPopulation.GetGenome(i))
 			{
-				PoleBalancingSystem system(0.0);
+				PoleBalancingSystem system(true);
 				double fitness = 0.0;
 
-				for (uint t = 0; t < 5000; ++t)
+				double deltaTime = 0.02;
+				uint maxSteps = static_cast<uint>(100.0 / deltaTime);
+
+				for (uint t = 0; t < maxSteps; ++t)
 				{
 					std::vector<double> inputs;
 					inputs.push_back(system.myPoleAngle);
@@ -229,10 +261,14 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Neat::Population& aPopul
 					std::vector<double> outputs;
 					genome->Evaluate(inputs, outputs);
 
-					system.Update(outputs[0], 0.02);
+					double force = 1.0;
+					if (outputs[0] < outputs[1])
+						force = -1.0;
+					system.Update(force, deltaTime);
+					if (!system.IsPoleUp())
+						continue;
 
-					if (system.IsPoleUp())
-						fitness += 0.0002;
+					fitness += 1.0;
 				}
 
 				genome->SetFitness(fitness);
@@ -245,15 +281,12 @@ void TrainNeat()
 {
 	Thread::WorkerPool threadPool(Thread::WorkerPriority::High);
 #if DEBUG_BUILD
-	threadPool.SetWorkersCount(2); // Using several threads is slower in Debug...
+	threadPool.SetWorkersCount(1); // Using several threads is slower in Debug...
 #else
 	threadPool.SetWorkersCount();
 #endif
 
-	std::random_device rd;
-	Neat::EvolutionParams::SetRandomSeed(rd());
-
-	Neat::Population population = Neat::Population(100, 4, 1);
+	Neat::Population population = Neat::Population(100, 4, 2);
 	Neat::Population::TrainingCallbacks callbacks;
 
 	callbacks.myEvaluateGenomes = [&population, &threadPool]() {
@@ -267,18 +300,21 @@ void TrainNeat()
 		threadPool.WaitIdle();
 	};
 
-	callbacks.myOnTrainGenerationEnd = [&population]() {
+	int generationIdx = 0;
+	callbacks.myOnTrainGenerationEnd = [&population, &generationIdx]() {
+		population.Check();
 		std::cout << "Population Size : " << population.GetSize() << std::endl;
 		std::cout << "Species Count : " << population.GetSpecies().size() << std::endl;
 		if (const Neat::Genome* bestGenome = population.GetBestGenome())
 		{
-			std::cout << "Generation Best Fitness : " << bestGenome->GetFitness() << std::endl;
+			std::cout << "Generation " << generationIdx << ": Best Fitness : " << bestGenome->GetFitness() << std::endl;
 		}
+		generationIdx++;
 	};
 
 	uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
 
-	population.TrainGenerations(callbacks, 100, 0.9);
+	population.TrainGenerations(callbacks, 100, 4900);
 
 	uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
 	std::cout << "Training duration (ms) : " << duration << std::endl;
@@ -295,6 +331,10 @@ int main()
 	InitMemoryLeaksDetection();
 
 	Core::Facade::Create(__argc, __argv);
+
+	std::random_device rd;
+	unsigned int seed = rd();
+	Neat::EvolutionParams::SetRandomSeed(seed);
 
 	TrainNeat();
 

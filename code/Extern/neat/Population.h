@@ -14,6 +14,8 @@ public:
 	Population(size_t aCount, size_t anInputCount, size_t anOutputCount);
 	~Population();
 
+	bool Check() const; // Asserts that the genomes are not malformed
+
 	size_t GetSize() const { return myGenomes.size(); }
 	
 	struct TrainingCallbacks

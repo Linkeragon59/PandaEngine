@@ -109,7 +109,7 @@ Genome::Genome(const char* aFilePath)
 				continue;
 
 			std::uint64_t innovationId = std::stoull(tokens[0]);
-			LinkNodesWithInnovationId(std::stoull(tokens[1]), std::stoull(tokens[2]), std::stod(tokens[3]), std::stoi(tokens[4]), innovationId);
+			LinkNodes(innovationId, std::stoull(tokens[1]), std::stoull(tokens[2]), std::stod(tokens[3]), std::stoi(tokens[4]));
 			EvolutionParams::SetNextInnovationNumber(innovationId + 1);
 		}
 	}
@@ -154,18 +154,20 @@ Genome::Genome(const Genome* aParent1, const Genome* aParent2)
 			std::uniform_int_distribution<> rand(0, 1);
 			double weight = (rand(EvolutionParams::GetRandomGenerator()) == 0) ? primaryParentLink.GetWeight() : it2->second.GetWeight();
 
-			LinkNodesWithInnovationId(primaryParentLink.GetSrcNodeIdx(), primaryParentLink.GetDstNodeIdx(), weight, primaryParentLink.IsEnabled(), innovationId);
+			LinkNodes(innovationId, primaryParentLink.GetSrcNodeIdx(), primaryParentLink.GetDstNodeIdx(), weight, primaryParentLink.IsEnabled());
 		}
 		else
 		{
 			// Disjoint or Excess gene, ignore secondary parent
-			LinkNodesWithInnovationId(primaryParentLink.GetSrcNodeIdx(), primaryParentLink.GetDstNodeIdx(), primaryParentLink.GetWeight(), primaryParentLink.IsEnabled(), innovationId);
+			LinkNodes(innovationId, primaryParentLink.GetSrcNodeIdx(), primaryParentLink.GetDstNodeIdx(), primaryParentLink.GetWeight(), primaryParentLink.IsEnabled());
 		}
 	}
 }
 
 void Genome::Mutate()
 {
+	//Check();
+
 	std::uniform_real_distribution<> rand(0.0, 1.0);
 
 	if (rand(EvolutionParams::GetRandomGenerator()) <= EvolutionParams::ourLinkWeightMutationProba)
@@ -177,7 +179,82 @@ void Genome::Mutate()
 	if (rand(EvolutionParams::GetRandomGenerator()) <= EvolutionParams::ourNewNodeProba)
 		MutateAddNode();
 
-	//VerifyLinks();
+	//Check();
+}
+
+bool Genome::Check() const
+{
+	for (size_t idx = 0; idx < myNodes.size(); ++idx)
+	{
+		// Verify that all links are valid
+
+		for (std::uint64_t linkId : myNodes[idx].GetInputLinks())
+		{
+			auto it = myLinks.find(linkId);
+			assert(it != myLinks.end());
+			if (it == myLinks.end())
+				return false;
+
+			assert(it->second.GetDstNodeIdx() == idx);
+			if (it->second.GetDstNodeIdx() != idx)
+				return false;
+
+			assert(it->second.GetSrcNodeIdx() < it->second.GetDstNodeIdx());
+			if (it->second.GetSrcNodeIdx() >= it->second.GetDstNodeIdx())
+				return false;
+		}
+
+		// Verify there is no recursion in the network
+
+		std::set<size_t> dependencies;
+		bool collectedDependencies = CollectNodeDependencies(idx, dependencies);
+		assert(collectedDependencies);
+		if (!collectedDependencies)
+			return false;
+
+		if (myNodes[idx].GetType() == Node::Type::Bias || myNodes[idx].GetType() == Node::Type::Input)
+		{
+			// Verify Bias and Inputs don't have dependencies
+
+			assert(dependencies.size() == 0);
+			if (dependencies.size() > 0)
+				return false;
+		}
+		else
+		{
+			// Verify that all other nodes are connected to the Bias node and at least 1 Input node
+
+			bool connectedToBias = dependencies.contains(0);
+			assert(connectedToBias);
+			if (!connectedToBias)
+				return false;
+
+			bool connectedToInput = false;
+			for (size_t inputIdx = 0; inputIdx < myInputCount; ++inputIdx)
+			{
+				if (dependencies.contains(1 + inputIdx))
+				{
+					connectedToInput = true;
+					break;
+				}
+			}
+			assert(connectedToInput);
+			if (!connectedToInput)
+				return false;
+		}
+
+		// Verify that the nodes are correctly ordered (by execution)
+
+		for (size_t dependencyIdx : dependencies)
+		{
+			if (dependencyIdx >= idx)
+			{
+				assert(false);
+				return false;
+			}
+		}
+	}
+	return true;
 }
 
 bool Genome::Evaluate(const std::vector<double>& someInputs, std::vector<double>& someOutputs)
@@ -219,36 +296,55 @@ void Genome::LinkNodes(size_t aSrcNodeIdx, size_t aDstNodeIdx, double aWeight, b
 	myNodes[aDstNodeIdx].AddInputLink(innovationId);
 }
 
-void Genome::LinkNodesWithInnovationId(size_t aSrcNodeIdx, size_t aDstNodeIdx, double aWeight, bool anEnable, std::uint64_t anInnovationId)
+void Genome::LinkNodes(std::uint64_t anInnovationId, size_t aSrcNodeIdx, size_t aDstNodeIdx, double aWeight, bool anEnable)
 {
-	myLinks.insert({anInnovationId,Link(aSrcNodeIdx, aDstNodeIdx, aWeight, anEnable)});
+	myLinks.insert({ anInnovationId,Link(aSrcNodeIdx, aDstNodeIdx, aWeight, anEnable) });
 	myNodes[aDstNodeIdx].AddInputLink(anInnovationId);
 }
 
-bool Genome::DoNodesHaveDependencies(size_t aSrcNodeIdx, size_t aDstNodeIdx, std::set<size_t>& someCheckedNodes) const
+bool Genome::CollectNodeDependencies(size_t aNodeIdx, std::set<size_t>& someOutNodes, size_t aRecursion) const
 {
-	for (std::uint64_t linkId : myNodes[aDstNodeIdx].GetInputLinks())
+	if (aRecursion > myNodes.size())
+		return false;
+
+	for (std::uint64_t linkId : myNodes[aNodeIdx].GetInputLinks())
 	{
 		auto it = myLinks.find(linkId);
 		if (it == myLinks.end())
 			continue;
 
 		size_t srcIdx = it->second.GetSrcNodeIdx();
-		if (srcIdx < aSrcNodeIdx)
+		if (someOutNodes.contains(srcIdx))
 			continue;
 
-		if (someCheckedNodes.contains(srcIdx))
-			continue;
-
-		if (srcIdx == aSrcNodeIdx)
-			return true;
-
-		if (DoNodesHaveDependencies(aSrcNodeIdx, srcIdx, someCheckedNodes))
-			return true;
-
-		someCheckedNodes.insert(srcIdx);
+		someOutNodes.insert(srcIdx);
+		CollectNodeDependencies(srcIdx, someOutNodes, aRecursion + 1);
 	}
-	return false;
+	return true;
+}
+
+void Genome::MoveNode(size_t anOldNodeIdx, size_t aNewNodeIdx)
+{
+	assert(anOldNodeIdx != aNewNodeIdx);
+	if (anOldNodeIdx == aNewNodeIdx)
+		return;
+
+	if (anOldNodeIdx > aNewNodeIdx)
+	{
+		// Node was advanced earlier in the execution list
+		myNodes.insert(myNodes.begin() + aNewNodeIdx, std::move(myNodes[anOldNodeIdx]));
+		myNodes.erase(myNodes.begin() + anOldNodeIdx + 1);
+	}
+	else
+	{
+		// Node was pushed further in the execution list
+		myNodes.insert(myNodes.begin() + aNewNodeIdx + 1, std::move(myNodes[anOldNodeIdx]));
+		myNodes.erase(myNodes.begin() + anOldNodeIdx);
+	}
+
+	// Node indices changed, so all links have to be updated
+	for (auto it = myLinks.begin(); it != myLinks.end(); ++it)
+		it->second.UpdateAfterNodeMove(anOldNodeIdx, aNewNodeIdx);
 }
 
 void Genome::MutateLinkWeights()
@@ -273,27 +369,26 @@ void Genome::MutateLinkWeights()
 void Genome::MutateAddLink()
 {
 	auto getRandomConnectableSrcNodeIdx = [this](size_t aDstNodeIdx) {
-		Node& dstNode = myNodes[aDstNodeIdx];
-
 		std::set<size_t> availableSrcNodeIdx;
-		for (size_t i = 0; i < aDstNodeIdx; ++i)
+
+		std::set<size_t> dstDependencies;
+		CollectNodeDependencies(aDstNodeIdx, dstDependencies);
+		for (size_t i = 0, e = myNodes.size() - myOutputCount; i < e; ++i)
+		{
+			if (i == aDstNodeIdx || dstDependencies.contains(i))
+				continue;
+
+			std::set<size_t> srcDependencies;
+			CollectNodeDependencies(i, srcDependencies);
+
+			if (srcDependencies.contains(aDstNodeIdx))
+				continue;
+
 			availableSrcNodeIdx.insert(i);
-		for (size_t i = aDstNodeIdx + 1, e = myNodes.size() - myOutputCount; i < e; ++i)
-		{
-			std::set<size_t> checkedNodes;
-			if (!DoNodesHaveDependencies(aDstNodeIdx, i, checkedNodes))
-				availableSrcNodeIdx.insert(i);
 		}
 
-		if (dstNode.GetInputLinks().size() >= availableSrcNodeIdx.size())
-			return aDstNodeIdx;
-
-		for (uint64_t linkId : dstNode.GetInputLinks())
-		{
-			auto it = myLinks.find(linkId);
-			if (it != myLinks.end() && it->second.IsEnabled())
-				availableSrcNodeIdx.erase(it->second.GetSrcNodeIdx());
-		}
+		if (availableSrcNodeIdx.size() == 0)
+			return aDstNodeIdx; // Already fully connected
 
 		std::uniform_int_distribution<> rand(0, (int)availableSrcNodeIdx.size() - 1);
 		auto randIt = availableSrcNodeIdx.begin();
@@ -309,16 +404,24 @@ void Genome::MutateAddLink()
 
 	if (srcNodeIdx > dstNodeIdx)
 	{
-		// Need to push the dst node later in the execution order, just after the src node
-		myNodes.insert(myNodes.begin() + srcNodeIdx + 1, std::move(myNodes[dstNodeIdx]));
-		myNodes.erase(myNodes.begin() + dstNodeIdx);
+		std::set<size_t> srcDependencies;
+		CollectNodeDependencies(srcNodeIdx, srcDependencies);
 
-		// Node indices changed, so all links have to be updated
-		for (auto it = myLinks.begin(); it != myLinks.end(); ++it)
-			it->second.UpdateAfterNodePush(dstNodeIdx, srcNodeIdx);
+		std::vector<size_t> nodesToMove;
+		nodesToMove.reserve(srcDependencies.size() + 1);
+		nodesToMove.push_back(srcNodeIdx);
+		for (size_t idx : srcDependencies)
+			if (idx > dstNodeIdx)
+				nodesToMove.push_back(idx);
+		std::sort(nodesToMove.begin(), nodesToMove.end());
 
-		dstNodeIdx = srcNodeIdx;
-		srcNodeIdx--;
+		// Move al these nodes before the dstNode, keeping them ordered
+		for (size_t idx : nodesToMove)
+		{
+			MoveNode(idx, dstNodeIdx);
+			dstNodeIdx++; // the dstNode has been pushed forward as a result
+		}
+		srcNodeIdx = dstNodeIdx - 1;
 	}
 
 	std::uniform_real_distribution<> rand2(-EvolutionParams::ourLinkWeightBound, EvolutionParams::ourLinkWeightBound);
@@ -379,18 +482,5 @@ void Genome::MutateAddNode()
 	LinkNodes(linkToSplit.GetSrcNodeIdx(), newNodeIdx, 1.0, true);
 	LinkNodes(newNodeIdx, linkToSplit.GetDstNodeIdx(), linkToSplit.GetWeight(), true);
 }
-
-//void Genome::VerifyLinks() const
-//{
-//	for (size_t idx = 0; idx < myNodes.size(); ++idx)
-//	{
-//		for (std::uint64_t linkId : myNodes[idx].GetInputLinks())
-//		{
-//			auto it = myLinks.find(linkId);
-//			assert(it != myLinks.end());
-//			assert(it->second.GetDstNodeIdx() == idx);
-//		}
-//	}
-//}
 
 }

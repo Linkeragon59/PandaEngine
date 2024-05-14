@@ -25,13 +25,13 @@ public:
 	bool IsSplittable() const;
 
 	void UpdateAfterNodeAdd(size_t aNewNodeIdx);
-	void UpdateAfterNodePush(size_t anOldNodeIdx, size_t aNewNodeIdx);
+	void UpdateAfterNodeMove(size_t anOldNodeIdx, size_t aNewNodeIdx);
 	void SetWeight(double aWeight) { myWeight = aWeight; }
 	void SetEnabled(bool aEnable) { myEnabled = aEnable; }
 
 private:
 	void UpdateIdxAfterNodeAdd(size_t& aInOutNodeIdx, size_t aNewNodeIdx);
-	void UpdateIdxAfterNodePush(size_t& aInOutNodeIdx, size_t anOldNodeIdx, size_t aNewNodeIdx);
+	void UpdateIdxAfterNodeMove(size_t& aInOutNodeIdx, size_t anOldNodeIdx, size_t aNewNodeIdx);
 
 	size_t mySrcNodeIdx;
 	size_t myDstNodeIdx;

@@ -79,6 +79,9 @@ void Specie::AdjustFitness()
 		if (IsNew())
 			adjustedFitness *= EvolutionParams::ourSpecieNewBonus;
 
+		if (adjustedFitness < DBL_EPSILON)
+			adjustedFitness = DBL_EPSILON;
+
 		adjustedFitness /= myGenomes.size();
 
 		genome->AdjustFitness(adjustedFitness);

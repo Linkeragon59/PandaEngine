@@ -12,7 +12,6 @@ class Specie;
 class Genome
 {
 public:
-	Genome();
 	Genome(size_t anInputCount, size_t anOutputCount);
 	
 	Genome(const char* aFilePath);
@@ -20,6 +19,7 @@ public:
 
 	Genome(const Genome* aParent1, const Genome* aParent2);
 	void Mutate();
+	bool Check() const; // Asserts that the network is not malformed
 
 	const std::map<std::uint64_t, Link>& GetLinks() const { return myLinks; }
 
@@ -38,15 +38,14 @@ public:
 private:
 	size_t GetHiddenNodesCount() const { return myNodes.size() - 1 - myInputCount - myOutputCount; } // -1 for Bias
 	void LinkNodes(size_t aSrcNodeIdx, size_t aDstNodeIdx, double aWeight, bool anEnable);
-	void LinkNodesWithInnovationId(size_t aSrcNodeIdx, size_t aDstNodeIdx, double aWeight, bool anEnable, std::uint64_t anInnovationId);
+	void LinkNodes(std::uint64_t anInnovationId, size_t aSrcNodeIdx, size_t aDstNodeIdx, double aWeight, bool anEnable);
 
-	bool DoNodesHaveDependencies(size_t aSrcNodeIdx, size_t aDstNodeIdx, std::set<size_t>& someCheckedNodes) const;
+	bool CollectNodeDependencies(size_t aNodeIdx, std::set<size_t>& someOutNodes, size_t aRecursion = 0) const;
+	void MoveNode(size_t anOldNodeIdx, size_t aNewNodeIdx);
 
 	void MutateLinkWeights();
 	void MutateAddLink();
 	void MutateAddNode();
-
-	//void VerifyLinks() const;
 
 	std::vector<Node> myNodes;	// Sorted by execution order
 	std::map<std::uint64_t, Link> myLinks;

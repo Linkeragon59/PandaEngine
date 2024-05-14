@@ -24,6 +24,14 @@ Population::~Population()
 		delete specie;
 }
 
+bool Population::Check() const
+{
+	for (const Genome& genome : myGenomes)
+		if (!genome.Check())
+			return false;
+	return true;
+}
+
 void Population::TrainOneGeneration(const TrainingCallbacks& someCallbacks)
 {
 	if (someCallbacks.myOnTrainGenerationStart)
