@@ -6,5 +6,8 @@ set_target_properties(NeatPoleBalancing PROPERTIES FOLDER "Executables")
 add_subdirectory(NeatPoleBalancing2)
 set_target_properties(NeatPoleBalancing2 PROPERTIES FOLDER "Executables")
 
+add_subdirectory(NeatDoublePoleBalancing)
+set_target_properties(NeatDoublePoleBalancing PROPERTIES FOLDER "Executables")
+
 add_subdirectory(NeatXOR)
 set_target_properties(NeatXOR PROPERTIES FOLDER "Executables")

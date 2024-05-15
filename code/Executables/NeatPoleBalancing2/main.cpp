@@ -192,8 +192,6 @@ private:
 	PoleBalancingSystem* mySystem = nullptr;
 	bool myNeatControl = false;
 	Neat::Genome* myBalancingGenome = nullptr;
-
-	ImVec2 myPolePos = { 0.f, 0.f };
 };
 
 void NeatPoleBalancingModule::OnInitialize()
