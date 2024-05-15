@@ -30,7 +30,7 @@ struct PoleBalancingSystem
 	double GetPoleAngle() const { return std::atan2(std::sin(myPoleAngle), std::cos(myPoleAngle)); }
 	bool IsPoleUp() const { return std::abs(GetPoleAngle()) <= myPoleFailureAngle; }
 	bool IsSlowAndCentered() const;
-	void Draw();
+	void Draw(const glm::vec2& aMousePos);
 
 	double myInitPoleAngle = 0.0;
 	double myInitPoleVelocity = 0.0;
@@ -125,12 +125,13 @@ bool PoleBalancingSystem::IsSlowAndCentered() const
 	return true;
 }
 
-void PoleBalancingSystem::Draw()
+void PoleBalancingSystem::Draw(const glm::vec2& aMousePos)
 {
 	static const double windowWidthPhysical = 10.0;
 
 	ImVec2 size = ImGui::GetContentRegionAvail();
 	ImVec2 pos = ImGui::GetCursorScreenPos();
+	ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
 	ImVec2 trackSize = ImVec2(size.x * static_cast<float>(2.0 * myCartTrackSize / windowWidthPhysical), 20.f);
 	ImVec2 trackPos = pos + ImVec2(size.x / 2.f, size.y / 2.f);
@@ -140,10 +141,20 @@ void PoleBalancingSystem::Draw()
 
 	float poleSize = size.x * static_cast<float>(2.0 * myPoleLength / windowWidthPhysical);
 	ImVec2 poleEndPos = cartPos + ImVec2(poleSize * static_cast<float>(std::sin(myPoleAngle)), -poleSize * static_cast<float>(std::cos(myPoleAngle)));
+	glm::vec2 poleExtremityPos = glm::vec2(poleEndPos.x, poleEndPos.y);
+	while (glm::length(aMousePos - poleExtremityPos) < 50.f)
+	{
+		glm::vec2 poleVec = poleExtremityPos - glm::vec2(cartPos.x, cartPos.y);
+		glm::vec2 mouseVec = aMousePos - glm::vec2(cartPos.x, cartPos.y);
+		float mousePoleAngle = std::atan2(mouseVec.x * poleVec.y - poleVec.x * mouseVec.y, mouseVec.x * poleVec.x + mouseVec.y * poleVec.y);
+		myPoleAngle += mousePoleAngle > 0.f ? 0.01 : -0.01;
+		myPoleVelocity = 0.0;
+		poleEndPos = cartPos + ImVec2(poleSize * static_cast<float>(std::sin(myPoleAngle)), -poleSize * static_cast<float>(std::cos(myPoleAngle)));
+		poleExtremityPos = glm::vec2(poleEndPos.x, poleEndPos.y);
+	}
 
 	ImU32 trackColor = IsPoleUp() ? 0xFF00FF00 : 0xFF0000FF;
 
-	ImDrawList* draw_list = ImGui::GetWindowDrawList();
 	draw_list->AddRectFilled(trackPos - trackSize / 2.f, trackPos + trackSize / 2.f, trackColor);
 	draw_list->AddRectFilled(cartPos - cartSize / 2.f, cartPos + cartSize / 2.f, 0xFFFFFFFF);
 	draw_list->AddLine(cartPos, poleEndPos, 0xFFFF0000, 5.f);
@@ -153,6 +164,10 @@ void PoleBalancingSystem::Draw()
 	draw_list->AddText(trackPos + ImVec2(0.f, 75.f), 0xFFFFFFFF, std::format("Position : {}", myCartPosition).c_str());
 	draw_list->AddText(trackPos + ImVec2(0.f, 100.f), 0xFFFFFFFF, std::format("Pole Velocity : {}", myPoleVelocity).c_str());
 	draw_list->AddText(trackPos + ImVec2(0.f, 125.f), 0xFFFFFFFF, std::format("Cart Velocity : {}", myCartVelocity).c_str());
+
+	draw_list->AddCircleFilled(poleEndPos, 5.f, 0xFFFF0000);
+	draw_list->AddCircleFilled(ImVec2(aMousePos.x, aMousePos.y), 5.f, 0xFFFF0000);
+	draw_list->AddCircle(ImVec2(aMousePos.x, aMousePos.y), 50.f, 0xFFFF0000);
 }
 
 class NeatPoleBalancingModule : public Core::Module
@@ -174,18 +189,11 @@ private:
 	Core::Entity myGuiEntity;
 	Render::EntityGuiComponent* myGui = nullptr;
 
-	void ResetPoleUpHistory();
-	float GetAveragePoleUp() const;
-
 	PoleBalancingSystem* mySystem = nullptr;
 	bool myNeatControl = false;
-	bool myOutOfControl = false;
-	float myDurationSlowAndCenter = 0.f;
-	bool myPoleUpHistory[70];
-	uint myPoleUpHistoryPos = 0;
-	uint64 myNextPoleUpCheck = 0;
 	Neat::Genome* myBalancingGenome = nullptr;
-	Neat::Genome* myResettingGenome = nullptr;
+
+	ImVec2 myPolePos = { 0.f, 0.f };
 };
 
 void NeatPoleBalancingModule::OnInitialize()
@@ -199,17 +207,13 @@ void NeatPoleBalancingModule::OnInitialize()
 	myGui = myGuiEntity.AddComponent<Render::EntityGuiComponent>(myWindow, false);
 	myGui->myCallback = [this]() { OnGuiUpdate(); };
 
-	mySystem = new PoleBalancingSystem(PI, 0.0, false);
-	myBalancingGenome = new Neat::Genome("neat/poleBalancing");
-	myResettingGenome = new Neat::Genome("neat/poleResetting");
-
-	ResetPoleUpHistory();
+	mySystem = new PoleBalancingSystem(0.0, 0.0, false);
+	myBalancingGenome = new Neat::Genome("neat/poleBalancing2");
 }
 
 void NeatPoleBalancingModule::OnFinalize()
 {
 	SafeDelete(myBalancingGenome);
-	SafeDelete(myResettingGenome);
 	SafeDelete(mySystem);
 
 	myGuiEntity.Destroy();
@@ -241,44 +245,12 @@ void NeatPoleBalancingModule::OnUpdate(Core::Module::UpdateType aType)
 			inputs.push_back(mySystem->myCartPosition);
 			inputs.push_back(mySystem->myCartVelocity);
 			std::vector<double> outputs;
-			if (myOutOfControl)
-				myResettingGenome->Evaluate(inputs, outputs);
-			else
-				myBalancingGenome->Evaluate(inputs, outputs);
+			myBalancingGenome->Evaluate(inputs, outputs);
 
 			double force = 1.0;
 			if (outputs[0] < outputs[1])
 				force = -1.0;
 			mySystem->Update(force, Core::TimeModule::GetInstance()->GetDeltaTimeSec());
-
-			if (mySystem->IsSlowAndCentered())
-				myDurationSlowAndCenter += Core::TimeModule::GetInstance()->GetDeltaTimeSec();
-			else
-				myDurationSlowAndCenter = 0.f;
-
-			if (myOutOfControl && myDurationSlowAndCenter > 2.f)
-			{
-				myOutOfControl = false;
-				ResetPoleUpHistory();
-			}
-			else if (!myOutOfControl && GetAveragePoleUp() < 0.2f)
-			{
-				myOutOfControl = true;
-			}
-
-			if (!myOutOfControl)
-			{
-				uint64 currentTimeMs = Core::TimeModule::GetInstance()->GetTimeMs();
-				if (currentTimeMs >= myNextPoleUpCheck)
-				{
-					myPoleUpHistory[myPoleUpHistoryPos] = mySystem->IsPoleUp();
-					myPoleUpHistoryPos++;
-					if (myPoleUpHistoryPos >= sizeof(myPoleUpHistory))
-						myPoleUpHistoryPos = 0;
-
-					myNextPoleUpCheck = currentTimeMs + 100;
-				}
-			}
 		}
 		else
 		{
@@ -299,18 +271,12 @@ void NeatPoleBalancingModule::OnUpdate(Core::Module::UpdateType aType)
 
 void NeatPoleBalancingModule::OnGuiUpdate()
 {
-	mySystem->Draw();
+	double mouseX = 0.0, mouseY = 0.0;
+	Core::InputModule::GetInstance()->PollCursorPosition(mouseX, mouseY, myWindow);
+	mySystem->Draw(glm::vec2(mouseX, mouseY));
 	if (myNeatControl)
 	{
 		ImGui::Text("NEAT control");
-		if (myOutOfControl)
-		{
-			ImGui::Text("NEAT out of control, trying to reset");
-		}
-		else
-		{
-			ImGui::Text("NEAT in control, trying to balance (success average : %f)", GetAveragePoleUp());
-		}
 	}
 	else
 	{
@@ -318,25 +284,9 @@ void NeatPoleBalancingModule::OnGuiUpdate()
 	}
 }
 
-void NeatPoleBalancingModule::ResetPoleUpHistory()
+void EvaluatePopulationAsync(Thread::WorkerPool& aPool, PoleBalancingSystems& someSystems, Neat::Population& aPopulation, size_t aStartIdx, size_t aEndIdx)
 {
-	memset(myPoleUpHistory, true, sizeof(myPoleUpHistory));
-	myPoleUpHistoryPos = 0;
-	myNextPoleUpCheck = Core::TimeModule::GetInstance()->GetTimeMs();
-}
-
-float NeatPoleBalancingModule::GetAveragePoleUp() const
-{
-	uint poleUpCount = 0;
-	for (size_t i = 0; i < sizeof(myPoleUpHistory); ++i)
-		if (myPoleUpHistory[i])
-			poleUpCount++;
-	return (float)poleUpCount / sizeof(myPoleUpHistory);
-}
-
-void EvaluatePopulationAsync(bool aBalancingTraining, Thread::WorkerPool& aPool, PoleBalancingSystems& someSystems, Neat::Population& aPopulation, size_t aStartIdx, size_t aEndIdx)
-{
-	aPool.RequestJob([aBalancingTraining, &someSystems, &aPopulation, aStartIdx, aEndIdx]() {
+	aPool.RequestJob([&someSystems, &aPopulation, aStartIdx, aEndIdx]() {
 		for (size_t i = aStartIdx; i < aEndIdx; ++i)
 		{
 			if (Neat::Genome* genome = aPopulation.GetGenome(i))
@@ -344,7 +294,7 @@ void EvaluatePopulationAsync(bool aBalancingTraining, Thread::WorkerPool& aPool,
 				double fitness = 0.0;
 				
 				double deltaTime = 0.02;
-				uint maxSteps = static_cast<uint>(20.0 / deltaTime);
+				uint maxSteps = static_cast<uint>(30.0 / deltaTime);
 				double fitnessStep = 1.0 / static_cast<double>(maxSteps * someSystems.size());
 
 				for (PoleBalancingSystem system : someSystems)
@@ -367,16 +317,10 @@ void EvaluatePopulationAsync(bool aBalancingTraining, Thread::WorkerPool& aPool,
 						
 						system.Update(force, deltaTime);
 						
-						if (aBalancingTraining)
-						{
-							if (!system.IsPoleUp())
-								continue;
-						}
-						else
-						{
-							if (!system.IsSlowAndCentered())
-								continue;
-						}
+						if (!system.IsPoleUp())
+							continue;
+						if (!system.IsSlowAndCentered())
+							continue;
 
 						fitness += fitnessStep;
 					}
@@ -388,7 +332,7 @@ void EvaluatePopulationAsync(bool aBalancingTraining, Thread::WorkerPool& aPool,
 	});
 }
 
-void TrainNeat(bool aBalancingTraining)
+void TrainNeat()
 {
 	Thread::WorkerPool threadPool(Thread::WorkerPriority::High);
 #if DEBUG_BUILD
@@ -398,22 +342,10 @@ void TrainNeat(bool aBalancingTraining)
 #endif
 
 	PoleBalancingSystems systems;
-	if (aBalancingTraining)
-	{
-		uint systemsCount = 10;
-		systems.reserve(2 * systemsCount);
-		for (uint i = 0; i < systemsCount; ++i)
-			systems.push_back(PoleBalancingSystem(0.0, 1.0, false));
-		for (uint i = 0; i < systemsCount; ++i)
-			systems.push_back(PoleBalancingSystem(PI, 0.1, false));
-	}
-	else
-	{
-		uint systemsCount = 10;
-		systems.reserve(systemsCount);
-		for (uint i = 0; i < systemsCount; ++i)
-			systems.push_back(PoleBalancingSystem(0.0, 1.0, true));
-	}
+	uint systemsCount = 10;
+	systems.reserve(systemsCount);
+	for (uint i = 0; i < systemsCount; ++i)
+		systems.push_back(PoleBalancingSystem(0.0, 1.0, false));
 
 	PoleBalancingSystemPool systemsPool;
 	systemsPool.resize(threadPool.GetWorkersCount(), systems);
@@ -421,13 +353,13 @@ void TrainNeat(bool aBalancingTraining)
 	Neat::Population population = Neat::Population(200, 4, 2);
 	Neat::Population::TrainingCallbacks callbacks;
 
-	callbacks.myEvaluateGenomes = [aBalancingTraining, &population, &threadPool, &systemsPool]() {
+	callbacks.myEvaluateGenomes = [&population, &threadPool, &systemsPool]() {
 		size_t runPerThread = population.GetSize() / threadPool.GetWorkersCount() + 1;
 		size_t startIdx = 0;
 		uint systemPoolIdx = 0;
 		while (startIdx < population.GetSize())
 		{
-			EvaluatePopulationAsync(aBalancingTraining, threadPool, systemsPool[systemPoolIdx], population, startIdx, startIdx + runPerThread);
+			EvaluatePopulationAsync(threadPool, systemsPool[systemPoolIdx], population, startIdx, startIdx + runPerThread);
 			startIdx = std::min(population.GetSize(), startIdx + runPerThread);
 			systemPoolIdx++;
 		}
@@ -435,7 +367,7 @@ void TrainNeat(bool aBalancingTraining)
 	};
 
 	int generationIdx = 0;
-	callbacks.myOnTrainGenerationEnd = [aBalancingTraining, &population, &generationIdx]() {
+	callbacks.myOnTrainGenerationEnd = [&population, &generationIdx]() {
 		population.Check();
 		std::cout << "Population Size : " << population.GetSize() << std::endl;
 		std::cout << "Species Count : " << population.GetSpecies().size() << std::endl;
@@ -445,7 +377,7 @@ void TrainNeat(bool aBalancingTraining)
 
 			if (generationIdx % 100 == 0)
 			{
-				std::string fileName = aBalancingTraining ? "neat/poleBalancing" : "neat/poleResetting";
+				std::string fileName = "neat/poleBalancing2";
 				fileName += std::format("_{}", generationIdx);
 				bestGenome->SaveToFile(fileName.c_str());
 			}
@@ -462,7 +394,7 @@ void TrainNeat(bool aBalancingTraining)
 
 	if (const Neat::Genome* bestGenome = population.GetBestGenome())
 	{
-		bestGenome->SaveToFile(aBalancingTraining ? "neat/poleBalancing" : "neat/poleResetting");
+		bestGenome->SaveToFile("neat/poleBalancing2");
 		std::cout << "Best Fitness : " << bestGenome->GetFitness() << std::endl;
 	}
 }
@@ -477,8 +409,7 @@ int main()
 	unsigned int seed = rd();
 	Neat::EvolutionParams::SetRandomSeed(seed);
 
-	//TrainNeat(true);
-	//TrainNeat(false);
+	//TrainNeat();
 
 	Render::RenderModule::Register();
 	NeatPoleBalancingModule::Register();
