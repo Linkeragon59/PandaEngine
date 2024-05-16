@@ -12,6 +12,7 @@ class Population
 {
 public:
 	Population(size_t aCount, size_t anInputCount, size_t anOutputCount);
+	Population(size_t aCount, const char* aFilePath);
 	~Population();
 
 	bool Check() const; // Asserts that the genomes are not malformed

@@ -56,7 +56,7 @@ void NeatDoublePoleBalancingModule::OnInitialize()
 	myGui = myGuiEntity.AddComponent<Render::EntityGuiComponent>(myWindow, false);
 	myGui->myCallback = [this]() { OnGuiUpdate(); };
 
-	mySystem = new CartPole();
+	mySystem = new CartPole(false);
 	myBalancingGenome = new Neat::Genome("neat/doublePoleBalancing");
 }
 
@@ -101,6 +101,7 @@ void NeatDoublePoleBalancingModule::OnUpdate(Core::Module::UpdateType aType)
 			double force = 1.0;
 			if (outputs[0] < outputs[1])
 				force = -1.0;
+
 			mySystem->Update(force, Core::TimeModule::GetInstance()->GetDeltaTimeSec());
 		}
 		else
@@ -133,9 +134,9 @@ void NeatDoublePoleBalancingModule::OnGuiUpdate()
 	}
 }
 
-void EvaluatePopulationAsync(Thread::WorkerPool& aPool, CartPoles& someSystems, Neat::Population& aPopulation, size_t aStartIdx, size_t aEndIdx)
+void EvaluatePopulationAsync(Thread::WorkerPool& aPool, CartPoles& someSystems, Neat::Population& aPopulation, size_t aStartIdx, size_t aEndIdx, double aDuration)
 {
-	aPool.RequestJob([&someSystems, &aPopulation, aStartIdx, aEndIdx]() {
+	aPool.RequestJob([&someSystems, &aPopulation, aStartIdx, aEndIdx, aDuration]() {
 		for (size_t i = aStartIdx; i < aEndIdx; ++i)
 		{
 			if (Neat::Genome* genome = aPopulation.GetGenome(i))
@@ -143,7 +144,7 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, CartPoles& someSystems, 
 				double fitness = 0.0;
 				
 				double deltaTime = 0.02;
-				uint maxSteps = static_cast<uint>(15.0 / deltaTime);
+				uint maxSteps = static_cast<uint>(aDuration / deltaTime);
 				double fitnessStep = 1.0 / static_cast<double>(maxSteps * someSystems.size());
 
 				for (CartPole system : someSystems)
@@ -183,7 +184,7 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, CartPoles& someSystems, 
 	});
 }
 
-void TrainNeat()
+void TrainNeat(const char* aFilePath, double aDuration)
 {
 	Thread::WorkerPool threadPool(Thread::WorkerPriority::High);
 #if DEBUG_BUILD
@@ -193,24 +194,26 @@ void TrainNeat()
 #endif
 
 	CartPoles systems;
-	uint systemsCount = 1;
-	systems.reserve(systemsCount);
-	for (uint i = 0; i < systemsCount; ++i)
-		systems.push_back(CartPole());
+	//uint systemsCount = 2;
+	//systems.reserve(systemsCount + 1);
+	systems.push_back(CartPole(false));
+	//for (uint i = 0; i < systemsCount; ++i)
+	//	systems.push_back(CartPole(true));
 
 	CartPolePool systemsPool;
 	systemsPool.resize(threadPool.GetWorkersCount(), systems);
 
-	Neat::Population population = Neat::Population(500, 6, 2);
+	size_t popSize = 10000;
+	Neat::Population population = aFilePath ? Neat::Population(popSize, aFilePath) : Neat::Population(popSize, 6, 2);
 	Neat::Population::TrainingCallbacks callbacks;
 
-	callbacks.myEvaluateGenomes = [&population, &threadPool, &systemsPool]() {
+	callbacks.myEvaluateGenomes = [&population, &threadPool, &systemsPool, aDuration]() {
 		size_t runPerThread = population.GetSize() / threadPool.GetWorkersCount() + 1;
 		size_t startIdx = 0;
 		uint systemPoolIdx = 0;
 		while (startIdx < population.GetSize())
 		{
-			EvaluatePopulationAsync(threadPool, systemsPool[systemPoolIdx], population, startIdx, startIdx + runPerThread);
+			EvaluatePopulationAsync(threadPool, systemsPool[systemPoolIdx], population, startIdx, startIdx + runPerThread, aDuration);
 			startIdx = std::min(population.GetSize(), startIdx + runPerThread);
 			systemPoolIdx++;
 		}
@@ -238,7 +241,7 @@ void TrainNeat()
 
 	uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
 
-	population.TrainGenerations(callbacks, 10000, 1.0);
+	population.TrainGenerations(callbacks, 1000, 1.0);
 
 	uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
 	std::cout << "Training duration (ms) : " << duration << std::endl;
@@ -259,7 +262,16 @@ int main()
 	std::random_device rd;
 	unsigned int seed = rd();
 	Neat::EvolutionParams::SetRandomSeed(seed);
-	//TrainNeat();
+	TrainNeat(nullptr, 5.0);
+	//Neat::EvolutionParams::ourNewNodeProba = 0.1;
+	//Neat::EvolutionParams::ourNewLinkProba = 0.1;
+	//double duration = 10.0;
+	//TrainNeat(nullptr, 10.0);
+	//while (duration < 100.0)
+	//{
+	//	duration += duration;
+	//	TrainNeat("neat/doublePoleBalancing", duration);
+	//}
 
 	Render::RenderModule::Register();
 	NeatDoublePoleBalancingModule::Register();

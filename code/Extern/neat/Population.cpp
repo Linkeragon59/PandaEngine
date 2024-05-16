@@ -18,6 +18,18 @@ Population::Population(size_t aCount, size_t anInputCount, size_t anOutputCount)
 	}
 }
 
+Population::Population(size_t aCount, const char* aFilePath)
+{
+	Genome baseGenome = Genome(aFilePath);
+
+	myGenomes.reserve(aCount);
+	for (size_t i = 0; i < aCount; ++i)
+	{
+		Genome& genome = myGenomes.emplace_back(baseGenome);
+		genome.Mutate();
+	}
+}
+
 Population::~Population()
 {
 	for (Specie* specie : mySpecies)
@@ -120,7 +132,7 @@ void Population::TrainGenerations(const TrainingCallbacks& someCallbacks, int aM
 	{
 		TrainOneGeneration(someCallbacks);
 		const Genome* bestGenome = GetBestGenome();
-		if (bestGenome && bestGenome->GetFitness() > aSatisfactionThreshold)
+		if (bestGenome && bestGenome->GetFitness() >= aSatisfactionThreshold)
 			break;
 	}
 }

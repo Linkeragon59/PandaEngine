@@ -3,7 +3,7 @@
 class CartPole
 {
 public:
-	CartPole();
+	CartPole(bool aRandomize);
 	void Reset();
 	void Update(double aForceAmplitude, double aDeltaTime);
 	void Draw();
@@ -20,6 +20,7 @@ public:
 
 private:
 	void Step(double aForce, double* aState, double* aDerivs);
+	void Step2(double aForce, double* aState, double* aDerivs);
 
 	// Runge - Kutta 4th order integration method
 	void RK4(double aForce, double aDeltaTime);
@@ -31,7 +32,7 @@ private:
 	double myPole1Mass = 0.1;
 	double myPole2Mass = 0.05;
 	double myGravity = -9.81;
-	double myInputForce = 3.0;
+	double myInputForce = 10.0;
 	double myPoleFailureAngle = 0.628329;
 
 	// 0 : CartPosistion
@@ -41,6 +42,7 @@ private:
 	// 4 : Pole2Angle
 	// 5 : Pole2Velosity
 	double myState[6];
+	double myInitState[6];
 };
 
 typedef std::vector<CartPole> CartPoles;

@@ -9,5 +9,8 @@ set_target_properties(NeatPoleBalancing2 PROPERTIES FOLDER "Executables")
 add_subdirectory(NeatDoublePoleBalancing)
 set_target_properties(NeatDoublePoleBalancing PROPERTIES FOLDER "Executables")
 
+add_subdirectory(NeatDoublePoleBalancing2)
+set_target_properties(NeatDoublePoleBalancing2 PROPERTIES FOLDER "Executables")
+
 add_subdirectory(NeatXOR)
 set_target_properties(NeatXOR PROPERTIES FOLDER "Executables")

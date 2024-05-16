@@ -1,22 +1,39 @@
 #include "CartPole.h"
-
+#include "EvolutionParams.h"
+#include <random>
 #include "imgui_helpers.h"
 
 #define PI 3.14159265358979323846
 
-CartPole::CartPole()
+CartPole::CartPole(bool aRandomize)
 {
+	myInitState[0] = 0.0;
+	myInitState[1] = 0.0;
+	myInitState[2] = PI;
+	myInitState[3] = 0.0;
+	myInitState[4] = PI;
+	myInitState[5] = 0.0;
+	if (aRandomize)
+	{
+		std::uniform_real_distribution<> rand(-1.0, 1.0);
+		myInitState[0] += rand(Neat::EvolutionParams::GetRandomGenerator()) * 0.001;
+		//myInitState[1] += rand(Neat::EvolutionParams::GetRandomGenerator()) * 0.001;
+		myInitState[2] += rand(Neat::EvolutionParams::GetRandomGenerator()) * PI / 100.f;
+		//myInitState[3] += rand(Neat::EvolutionParams::GetRandomGenerator()) * 0.001;
+		myInitState[4] += rand(Neat::EvolutionParams::GetRandomGenerator()) * PI / 100.f;
+		//myInitState[5] += rand(Neat::EvolutionParams::GetRandomGenerator()) * 0.001;
+	}
 	Reset();
 }
 
 void CartPole::Reset()
 {
-	myState[0] = 0.0;
-	myState[1] = 0.0;
-	myState[2] = 0.0;
-	myState[3] = 0.0;
-	myState[4] = 0.0;
-	myState[5] = 0.0;
+	myState[0] = myInitState[0];
+	myState[1] = myInitState[1];
+	myState[2] = myInitState[2];
+	myState[3] = myInitState[3];
+	myState[4] = myInitState[4];
+	myState[5] = myInitState[5];
 }
 
 void CartPole::Update(double aForceAmplitude, double aDeltaTime)
@@ -78,6 +95,10 @@ bool CartPole::IsSlowAndCentered() const
 
 void CartPole::Step(double aForce, double* aState, double* aDerivs)
 {
+	aDerivs[0] = aState[1];
+	aDerivs[2] = aState[3];
+	aDerivs[4] = aState[5];
+
 	double sinAngle1 = std::sin(aState[2]);
 	double cosAngle1 = std::cos(aState[2]);
 	double sinAngle2 = std::sin(aState[4]);
@@ -100,14 +121,65 @@ void CartPole::Step(double aForce, double* aState, double* aDerivs)
 	aDerivs[5] = -0.75 * (aDerivs[1] * cosAngle2 + myGravity * sinAngle2 + tmp2) / myPole2Length;
 }
 
+void CartPole::Step2(double aForce, double* aState, double* aDerivs)
+{
+	aDerivs[0] = aState[1];
+	aDerivs[2] = aState[3];
+	aDerivs[4] = aState[5];
+
+	aDerivs[1] = (4.0 * aForce * std::cos(2.0 * aState[4])
+		- 6.0 * aForce
+		+ 4.0 * aDerivs[2] * aDerivs[2] * std::cos(aState[2])
+		+ aDerivs[2] * aDerivs[2] * std::cos(aState[2] - aState[4])
+		- aDerivs[2] * aDerivs[2] * std::cos(aState[2] + 2.0 * aState[4])
+		+ 2.0 * aDerivs[2] * aDerivs[4] * std::cos(aState[2] - aState[4])
+		+ aDerivs[4] * aDerivs[4] * std::cos(aState[2] - aState[4])
+		- 29.43 * std::sin(2.0 * aState[2])
+		+ 9.81 * std::sin(2.0 * aState[2] + 2.0 * aState[4]))
+		/ (3.0 * std::cos(2.0 * aState[2])
+			- 22.0 * std::cos(2.0 * aState[4])
+			- std::cos(2.0 * aState[2] + 2.0 * aState[4])
+			+ 34.0);
+	aDerivs[3] = (-8.0 * aForce * std::sin(aState[2])
+		+ 4.0 * aForce * std::sin(aState[2] + 2.0 * aState[4])
+		+ 3.0 * aDerivs[2] * aDerivs[2] * std::sin(2.0 * aState[2])
+		+ 23.0 * aDerivs[2] * aDerivs[2] * std::sin(aState[4])
+		+ 22.0 * aDerivs[2] * aDerivs[2] * std::sin(2.0 * aState[4])
+		+ aDerivs[2] * aDerivs[2] * std::sin(2.0 * aState[2] + aState[4])
+		+ 46.0 * aDerivs[2] * aDerivs[4] * std::sin(aState[4])
+		+ 2.0 * aDerivs[2] * aDerivs[4] * std::sin(2.0 * aState[2] + aState[4])
+		+ 23.0 * aDerivs[4] * aDerivs[4] * std::sin(aState[4])
+		+ aDerivs[4] * aDerivs[4] * std::sin(2.0 * aState[2] + aState[4])
+		- 490.5 * std::cos(aState[2])
+		+ 215.82 * std::cos(aState[2] + 2.0 * aState[4]))
+		/ (3.0 * std::cos(2.0 * aState[2])
+			- 22.0 * std::cos(2.0 * aState[4])
+			- std::cos(2.0 * aState[2] + 2.0 * aState[4])
+			+ 34.0);
+	aDerivs[5] = -((100.0 * aDerivs[2] * aDerivs[2] * std::sin(aState[4]) + 981.0 * std::cos(aState[2] + aState[4]))
+		* (-std::pow(3.0 * std::sin(aState[2]) + std::sin(aState[2] + aState[4]), 2.0) + 28.0 * std::cos(aState[4]) + 42.0)
+		+ 0.5 * (200.0 * aDerivs[2] * aDerivs[4] * std::sin(aState[4])
+			+ 100.0 * aDerivs[4] * aDerivs[4] * std::sin(aState[4])
+			- 2943.0 * std::cos(aState[2])
+			- 981.0 * std::cos(aState[2] + aState[4]))
+		* (25.0 * std::cos(aState[4]) + 3.0 * std::cos(2.0 * aState[2] + aState[4]) + std::cos(2.0 * aState[2] + 2.0 * aState[4]) + 13.0)
+		+ 50.0 * (2.0 * std::sin(aState[2]) + 3.0 * std::sin(aState[2] - aState[4])
+			- 2.0 * std::sin(aState[2] + aState[4]) - std::sin(aState[2] + 2.0 * aState[4]))
+		* (-2.0 * aForce + 3.0 * aDerivs[2] * aDerivs[2] * std::cos(aState[2])
+			+ aDerivs[2] * aDerivs[2] * std::cos(aState[2] + aState[4])
+			+ 2.0 * aDerivs[2] * aDerivs[4] * std::cos(aState[2] + aState[4])
+			+ aDerivs[4] * aDerivs[4] * std::cos(aState[2] + aState[4])))
+		/ (75.0 * std::cos(2.0 * aState[2])
+			- 550.0 * std::cos(2.0 * aState[4])
+			- 25.0 * std::cos(2.0 * aState[2] + 2.0 * aState[4])
+			+ 850.0);
+}
+
 void CartPole::RK4(double aForce, double aDeltaTime)
 {
 	double stateTmp[6], derivs1[6], derivs2[6], derivs3[6];
 
 	Step(aForce, myState, derivs1);
-	derivs1[0] = myState[1];
-	derivs1[2] = myState[3];
-	derivs1[4] = myState[5];
 
 	for (uint i = 0; i < 6; ++i)
 	{
@@ -115,9 +187,6 @@ void CartPole::RK4(double aForce, double aDeltaTime)
 	}
 
 	Step(aForce, stateTmp, derivs2);
-	derivs2[0] = stateTmp[1];
-	derivs2[2] = stateTmp[3];
-	derivs2[4] = stateTmp[5];
 
 	for (uint i = 0; i < 6; ++i)
 	{
@@ -125,9 +194,6 @@ void CartPole::RK4(double aForce, double aDeltaTime)
 	}
 
 	Step(aForce, stateTmp, derivs3);
-	derivs3[0] = stateTmp[1];
-	derivs3[2] = stateTmp[3];
-	derivs3[4] = stateTmp[5];
 
 	for (uint i = 0; i < 6; ++i)
 	{
@@ -136,9 +202,6 @@ void CartPole::RK4(double aForce, double aDeltaTime)
 	}
 
 	Step(aForce, stateTmp, derivs2);
-	derivs2[0] = stateTmp[1];
-	derivs2[2] = stateTmp[3];
-	derivs2[4] = stateTmp[5];
 
 	for (uint i = 0; i < 6; ++i)
 	{
