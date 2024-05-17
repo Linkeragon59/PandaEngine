@@ -190,10 +190,10 @@ void TrainNeat()
 	Acrobots systems;
 	uint systemsCount = 4;
 	systems.reserve(2 * (systemsCount + 1));
-	systems.push_back(Acrobot(true, 0.0));
-	for (uint i = 0; i < systemsCount; ++i)
-		systems.push_back(Acrobot(true, 0.1));
-	//systems.push_back(Acrobot(false, 0.0));
+	//systems.push_back(Acrobot(true, 0.0));
+	//for (uint i = 0; i < systemsCount; ++i)
+	//	systems.push_back(Acrobot(true, 0.1));
+	systems.push_back(Acrobot(false, 0.0));
 	//for (uint i = 0; i < systemsCount; ++i)
 	//	systems.push_back(Acrobot(false, 0.1));
 
