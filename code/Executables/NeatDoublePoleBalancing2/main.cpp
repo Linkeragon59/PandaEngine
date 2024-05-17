@@ -40,7 +40,7 @@ private:
 	Core::Entity myGuiEntity;
 	Render::EntityGuiComponent* myGui = nullptr;
 
-	CartDoublePole* mySystem = nullptr;
+	CartDoublePole2* mySystem = nullptr;
 };
 
 void NeatDoublePoleBalancingModule::OnInitialize()
@@ -54,7 +54,7 @@ void NeatDoublePoleBalancingModule::OnInitialize()
 	myGui = myGuiEntity.AddComponent<Render::EntityGuiComponent>(myWindow, false);
 	myGui->myCallback = [this]() { OnGuiUpdate(); };
 
-	mySystem = new CartDoublePole();
+	mySystem = new CartDoublePole2();
 }
 
 void NeatDoublePoleBalancingModule::OnFinalize()

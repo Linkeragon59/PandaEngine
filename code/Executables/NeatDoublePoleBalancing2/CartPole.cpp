@@ -196,13 +196,9 @@ void CartDoublePole2::Step(double* dydt, double* y, double aForce)
 		0 , -z5 * sin1m2 * y[4] , 0
 	};
 
-	glm::dvec3 G = {
-		0, -f1 * sin1, -f2 * sin2
-	};
+	glm::dvec3 G = { 0, -f1 * sin1, -f2 * sin2 };
 
-	glm::dvec3 H = {
-		aForce, 0, 0
-	};
+	glm::dvec3 H = { aForce, 0, 0 };
 
 	glm::dvec3 ddy = -Minv * C * dy - Minv * G + Minv * H;
 

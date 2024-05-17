@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 
+add_subdirectory(NeatAcrobot)
+set_target_properties(NeatAcrobot PROPERTIES FOLDER "Executables")
+
 add_subdirectory(NeatPoleBalancing)
 set_target_properties(NeatPoleBalancing PROPERTIES FOLDER "Executables")
 

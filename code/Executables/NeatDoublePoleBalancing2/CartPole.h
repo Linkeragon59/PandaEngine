@@ -22,8 +22,8 @@ private:
 	void RK4(double aForce, double aDeltaTime);
 
 	double myCartTrackSize = 2.5;
-	double myPole1Length = 0.5;
-	double myPole2Length = 0.25;
+	double myPole1Length = 0.5; // Half
+	double myPole2Length = 0.25; // Half
 	double myCartMass = 1.0;
 	double myPole1Mass = 0.1;
 	double myPole2Mass = 0.05;
@@ -63,8 +63,8 @@ private:
 	void RK4(double aForce, double aDeltaTime);
 
 	double myCartTrackSize = 2.5;
-	double myPole1Length = 0.5;
-	double myPole2Length = 0.25;
+	double myPole1Length = 0.5; // Half
+	double myPole2Length = 0.25; // Half
 	double myCartMass = 1.0;
 	double myPole1Mass = 0.1;
 	double myPole2Mass = 0.05;
