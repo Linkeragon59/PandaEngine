@@ -200,7 +200,7 @@ void TrainNeat()
 	AcrobotPool systemsPool;
 	systemsPool.resize(threadPool.GetWorkersCount(), systems);
 
-	Neat::Population population = Neat::Population(200, 4, 3);
+	Neat::Population population = Neat::Population(500, 4, 3);
 	Neat::Population::TrainingCallbacks callbacks;
 
 	callbacks.myEvaluateGenomes = [&population, &threadPool, &systemsPool]() {
