@@ -2,13 +2,12 @@
 #include "EvolutionParams.h"
 #include "Specie.h"
 #include "Population.h"
-#include <stdlib.h>
-#include <random>
-
-#include <iostream>
 
 #include "Core_Thread.h"
 #include "Core_TimeModule.h"
+
+#include <iostream>
+#include <random>
 
 void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Neat::Population& aPopulation, size_t aStartIdx, size_t aEndIdx)
 {
@@ -43,7 +42,7 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Neat::Population& aPopul
 					error += std::abs(xorOutputs[j] - outputs[0]);
 				}
 
-				genome->SetFitness(std::pow(4.0 - error, 2.0)); // [0, 16]
+				genome->SetFitness(1.0 - error / 4.0);
 			}
 		}
 	});
@@ -62,7 +61,7 @@ void TrainNeat()
 	unsigned int seed = rd();
 	Neat::EvolutionParams::SetRandomSeed(seed);
 
-	Neat::Population population = Neat::Population(150, 2, 1);
+	Neat::Population population = Neat::Population(100, 2, 1);
 	Neat::Population::TrainingCallbacks callbacks;
 
 	callbacks.myEvaluateGenomes = [&population, &threadPool]() {
@@ -90,14 +89,14 @@ void TrainNeat()
 
 	uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
 
-	population.TrainGenerations(callbacks, 1000, 14.0);
+	population.TrainGenerations(callbacks, 1000, 0.9);
 
 	uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
 	std::cout << "Training duration (ms) : " << duration << std::endl;
 
 	if (const Neat::Genome* bestGenome = population.GetBestGenome())
 	{
-		bestGenome->SaveToFile("neat_xor");
+		bestGenome->SaveToFile("neat/xor");
 		std::cout << "Best Fitness : " << bestGenome->GetFitness() << std::endl;
 	}
 }
@@ -110,10 +109,8 @@ int main()
 
 	TrainNeat();
 
-	Neat::Genome genome("neat_xor");
+	Neat::Genome genome("neat/xor");
 	{
-		double error = 0.0;
-
 		double xorInputs[4][2] = {
 			{0.0, 0.0},
 			{0.0, 1.0},
@@ -136,8 +133,6 @@ int main()
 			genome.Evaluate(inputs, outputs);
 			std::cout << "XOR(" << xorInputs[j][0] << "," << xorInputs[j][1] << ") = " << outputs[0] << " (error: " << std::abs(xorOutputs[j] - outputs[0]) << ")" << std::endl;
 		}
-
-		genome.SetFitness(std::pow(4.0 - error, 2.0)); // [0, 16]}
 	}
 
 	Core::Facade::Destroy();

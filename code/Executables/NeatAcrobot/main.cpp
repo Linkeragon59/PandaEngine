@@ -169,10 +169,6 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Acrobots& someSystems, N
 
 						if (system.ArePolesUp())
 							fitness += fitnessStep;
-						if (system.ArePolesSlow())
-							fitness += 0.1 * fitnessStep;
-						if (!system.IsPole1Up())
-							fitness -= fitnessStep;
 					}
 				}
 
@@ -197,9 +193,9 @@ void TrainNeat()
 	systems.push_back(Acrobot(true, 0.0));
 	for (uint i = 0; i < systemsCount; ++i)
 		systems.push_back(Acrobot(true, 0.1));
-	systems.push_back(Acrobot(false, 0.0));
-	for (uint i = 0; i < systemsCount; ++i)
-		systems.push_back(Acrobot(false, 0.1));
+	//systems.push_back(Acrobot(false, 0.0));
+	//for (uint i = 0; i < systemsCount; ++i)
+	//	systems.push_back(Acrobot(false, 0.1));
 
 	AcrobotPool systemsPool;
 	systemsPool.resize(threadPool.GetWorkersCount(), systems);
@@ -263,7 +259,7 @@ int main()
 	unsigned int seed = rd();
 	Neat::EvolutionParams::SetRandomSeed(seed);
 
-	//TrainNeat();
+	TrainNeat();
 
 	Render::RenderModule::Register();
 	NeatAcrobotModule::Register();
