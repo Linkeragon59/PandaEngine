@@ -1,9 +1,9 @@
+#include "Acrobot.h"
+
 #include "Genome.h"
 #include "EvolutionParams.h"
 #include "Specie.h"
 #include "Population.h"
-#include <stdlib.h>
-#include <random>
 
 #include "Core_Facade.h"
 #include "Core_Module.h"
@@ -12,14 +12,12 @@
 #include "Core_InputModule.h"
 #include "Render_RenderModule.h"
 #include "Core_Thread.h"
-
 #include "Core_Entity.h"
 #include "Render_EntityRenderComponent.h"
 #include "imgui_helpers.h"
 
-#include "Acrobot.h"
-
 #include <iostream>
+#include <random>
 
 class NeatAcrobotModule : public Core::Module
 {
@@ -56,7 +54,7 @@ void NeatAcrobotModule::OnInitialize()
 	myGui = myGuiEntity.AddComponent<Render::EntityGuiComponent>(myWindow, false);
 	myGui->myCallback = [this]() { OnGuiUpdate(); };
 
-	mySystem = new Acrobot();
+	mySystem = new Acrobot(false, 0.0);
 	myBalancingGenome = new Neat::Genome("neat/acrobot");
 }
 
@@ -96,9 +94,11 @@ void NeatAcrobotModule::OnUpdate(Core::Module::UpdateType aType)
 			std::vector<double> outputs;
 			myBalancingGenome->Evaluate(inputs, outputs);
 
-			double force = 1.0;
-			if (outputs[0] < outputs[1])
+			double force = 0.0;
+			if (outputs[0] > outputs[1] && outputs[0] > outputs[2])
 				force = -1.0;
+			else if (outputs[2] > outputs[0] && outputs[2] > outputs[1])
+				force = +1.0;
 
 			mySystem->Update(force, Core::TimeModule::GetInstance()->GetDeltaTimeSec());
 		}
@@ -142,7 +142,7 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Acrobots& someSystems, N
 				double fitness = 0.0;
 
 				double deltaTime = 0.02;
-				uint maxSteps = static_cast<uint>(100.0 / deltaTime);
+				uint maxSteps = static_cast<uint>(25.0 / deltaTime);
 				double fitnessStep = 1.0 / static_cast<double>(maxSteps * someSystems.size());
 
 				for (Acrobot system : someSystems)
@@ -159,21 +159,20 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Acrobots& someSystems, N
 						std::vector<double> outputs;
 						genome->Evaluate(inputs, outputs);
 
-						double force = 1.0;
-						if (outputs[0] < outputs[1])
+						double force = 0.0;
+						if (outputs[0] > outputs[1] && outputs[0] > outputs[2])
 							force = -1.0;
+						else if (outputs[2] > outputs[0] && outputs[2] > outputs[1])
+							force = +1.0;
 
 						system.Update(force, deltaTime);
 
 						if (system.ArePolesUp())
 							fitness += fitnessStep;
-						else
-						{
-							if (system.IsPole1Down())
-								fitness -= 100.0 * fitnessStep;
-							if (system.IsPole2Down())
-								fitness -= 1.0 * fitnessStep;
-						}
+						if (system.ArePolesSlow())
+							fitness += 0.1 * fitnessStep;
+						if (!system.IsPole1Up())
+							fitness -= fitnessStep;
 					}
 				}
 
@@ -193,15 +192,19 @@ void TrainNeat()
 #endif
 
 	Acrobots systems;
-	uint systemsCount = 1;
-	systems.reserve(systemsCount);
+	uint systemsCount = 4;
+	systems.reserve(2 * (systemsCount + 1));
+	systems.push_back(Acrobot(true, 0.0));
 	for (uint i = 0; i < systemsCount; ++i)
-		systems.push_back(Acrobot());
+		systems.push_back(Acrobot(true, 0.1));
+	systems.push_back(Acrobot(false, 0.0));
+	for (uint i = 0; i < systemsCount; ++i)
+		systems.push_back(Acrobot(false, 0.1));
 
 	AcrobotPool systemsPool;
 	systemsPool.resize(threadPool.GetWorkersCount(), systems);
 
-	Neat::Population population = Neat::Population(200, 4, 2);
+	Neat::Population population = Neat::Population(200, 4, 3);
 	Neat::Population::TrainingCallbacks callbacks;
 
 	callbacks.myEvaluateGenomes = [&population, &threadPool, &systemsPool]() {
@@ -238,7 +241,7 @@ void TrainNeat()
 
 	uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
 
-	population.TrainGenerations(callbacks, 100000, DBL_MAX);
+	population.TrainGenerations(callbacks, 1000, DBL_MAX);
 
 	uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
 	std::cout << "Training duration (ms) : " << duration << std::endl;

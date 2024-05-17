@@ -5,7 +5,7 @@
 
 #define PI 3.14159265358979323846
 
-CartDoublePole::CartDoublePole()
+DoubleCartPole::DoubleCartPole()
 {
 	myInitState[0] = 0.0;
 	myInitState[1] = PI;
@@ -16,7 +16,7 @@ CartDoublePole::CartDoublePole()
 	Reset();
 }
 
-void CartDoublePole::Reset()
+void DoubleCartPole::Reset()
 {
 	myState[0] = myInitState[0];
 	myState[1] = myInitState[1];
@@ -26,12 +26,12 @@ void CartDoublePole::Reset()
 	myState[5] = myInitState[5];
 }
 
-void CartDoublePole::Update(double aForceAmplitude, double aDeltaTime)
+void DoubleCartPole::Update(double aForceAmplitude, double aDeltaTime)
 {
 	RK4(aForceAmplitude * myInputForce, aDeltaTime);
 }
 
-void CartDoublePole::Draw()
+void DoubleCartPole::Draw()
 {
 	static const double windowWidthPhysical = 10.0;
 
@@ -57,7 +57,7 @@ void CartDoublePole::Draw()
 	draw_list->AddLine(cartPos, pole2EndPos, 0xFF0000FF, 5.f);
 }
 
-void CartDoublePole::Step(double* dydt, double* y, double aForce)
+void DoubleCartPole::Step(double* dydt, double* y, double aForce)
 {
 	dydt[0] = y[3];
 	dydt[1] = y[4];
@@ -85,7 +85,7 @@ void CartDoublePole::Step(double* dydt, double* y, double aForce)
 	dydt[5] = -0.75 * (dydt[3] * cos2 + myGravity * sin2 + tmp2) / myPole2Length;
 }
 
-void CartDoublePole::RK4(double aForce, double aDeltaTime)
+void DoubleCartPole::RK4(double aForce, double aDeltaTime)
 {
 	double k1[6], k2[6], k3[6], k4[6], tmp[6];
 
@@ -107,7 +107,7 @@ void CartDoublePole::RK4(double aForce, double aDeltaTime)
 		myState[i] = myState[i] + (aDeltaTime / 6.0) * (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]);
 }
 
-CartDoublePole2::CartDoublePole2()
+DoubleCartPole2::DoubleCartPole2()
 {
 	myInitState[0] = 0.0;
 	myInitState[1] = PI;
@@ -118,7 +118,7 @@ CartDoublePole2::CartDoublePole2()
 	Reset();
 }
 
-void CartDoublePole2::Reset()
+void DoubleCartPole2::Reset()
 {
 	myState[0] = myInitState[0];
 	myState[1] = myInitState[1];
@@ -128,12 +128,12 @@ void CartDoublePole2::Reset()
 	myState[5] = myInitState[5];
 }
 
-void CartDoublePole2::Update(double aForceAmplitude, double aDeltaTime)
+void DoubleCartPole2::Update(double aForceAmplitude, double aDeltaTime)
 {
 	RK4(aForceAmplitude * myInputForce, aDeltaTime);
 }
 
-void CartDoublePole2::Draw()
+void DoubleCartPole2::Draw()
 {
 	static const double windowWidthPhysical = 10.0;
 
@@ -159,7 +159,7 @@ void CartDoublePole2::Draw()
 	draw_list->AddLine(pole1EndPos, pole2EndPos, 0xFF0000FF, 5.f);
 }
 
-void CartDoublePole2::Step(double* dydt, double* y, double aForce)
+void DoubleCartPole2::Step(double* dydt, double* y, double aForce)
 {
 	dydt[0] = y[3];
 	dydt[1] = y[4];
@@ -207,7 +207,7 @@ void CartDoublePole2::Step(double* dydt, double* y, double aForce)
 	dydt[5] = ddy[2] - myPoleFriction * dydt[2];
 }
 
-void CartDoublePole2::RK4(double aForce, double aDeltaTime)
+void DoubleCartPole2::RK4(double aForce, double aDeltaTime)
 {
 	double k1[6], k2[6], k3[6], k4[6], tmp[6];
 

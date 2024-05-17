@@ -3,14 +3,20 @@
 #include <random>
 #include "imgui_helpers.h"
 
-#define PI 3.14159265358979323846
-
-Acrobot::Acrobot()
+Acrobot::Acrobot(bool aStartUp, double aVariance)
 {
-	myInitState[0] = PI;
+	myInitState[0] = aStartUp ? PI : 0.0;
 	myInitState[1] = 0.0;
 	myInitState[2] = 0.0;
 	myInitState[3] = 0.0;
+	if (aVariance > DBL_EPSILON)
+	{
+		std::uniform_real_distribution<> rand(-aVariance, aVariance);
+		myInitState[0] += rand(Neat::EvolutionParams::GetRandomGenerator()) * PI;
+		myInitState[1] += rand(Neat::EvolutionParams::GetRandomGenerator()) * PI;
+		myInitState[2] += rand(Neat::EvolutionParams::GetRandomGenerator()) * 3.0;
+		myInitState[3] += rand(Neat::EvolutionParams::GetRandomGenerator()) * 3.0;
+	}
 	Reset();
 }
 
@@ -38,10 +44,12 @@ void Acrobot::Draw()
 	ImVec2 startPos = pos + ImVec2(size.x / 2.f, size.y / 2.f);
 
 	float pole1Size = size.x * static_cast<float>(myPole1Length / windowWidthPhysical);
-	ImVec2 pole1EndPos = startPos + ImVec2(pole1Size * static_cast<float>(std::sin(myState[0])), pole1Size * static_cast<float>(std::cos(myState[0])));
+	float pole1Angle = static_cast<float>(GetPole1Angle());
+	ImVec2 pole1EndPos = startPos + ImVec2(pole1Size * std::sin(pole1Angle), -pole1Size * std::cos(pole1Angle));
 
 	float pole2Size = size.x * static_cast<float>(myPole2Length / windowWidthPhysical);
-	ImVec2 pole2EndPos = pole1EndPos + ImVec2(pole2Size * static_cast<float>(std::sin(myState[0] + myState[1])), pole2Size * static_cast<float>(std::cos(myState[0] + myState[1])));
+	float pole2Angle = static_cast<float>(GetPole2Angle());
+	ImVec2 pole2EndPos = pole1EndPos + ImVec2(pole2Size * std::sin(pole2Angle), -pole2Size * std::cos(pole2Angle));
 
 	ImColor color = 0xFF00FF00;
 	if (!ArePolesUp())
@@ -53,25 +61,22 @@ void Acrobot::Draw()
 
 bool Acrobot::ArePolesUp() const
 {
-	if (std::abs(GetPole1Angle()) < PI - myPoleFailureAngle)
-		return false;
-	if (std::abs(GetPole2Angle()) > myPoleFailureAngle)
-		return false;
-	return true;
+	return IsPole1Up() && IsPole2Up();
 }
 
-bool Acrobot::IsPole1Down() const
+bool Acrobot::IsPole1Up() const
 {
-	if (std::abs(GetPole1Angle()) > myPoleFailureAngle)
-		return false;
-	return true;
+	return std::abs(GetPole1Angle()) < myPoleFailureAngle;
 }
 
-bool Acrobot::IsPole2Down() const
+bool Acrobot::IsPole2Up() const
 {
-	if (PI - std::abs(GetPole2Angle()) > myPoleFailureAngle)
-		return false;
-	return true;
+	return std::abs(GetPole2Angle()) < myPoleFailureAngle;
+}
+
+bool Acrobot::ArePolesSlow() const
+{
+	return std::abs(GetPole1Velocity()) < 1.0 && std::abs(GetPole2Velocity()) < 1.0;
 }
 
 void Acrobot::Step(double* dydt, double* y, double aForce)

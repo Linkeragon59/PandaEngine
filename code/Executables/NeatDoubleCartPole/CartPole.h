@@ -1,9 +1,9 @@
 #pragma once
 
-class CartDoublePole
+class DoubleCartPole
 {
 public:
-	CartDoublePole();
+	DoubleCartPole();
 	void Reset();
 	void Update(double aForceAmplitude, double aDeltaTime);
 	void Draw();
@@ -41,10 +41,10 @@ private:
 	double myInitState[6];
 };
 
-class CartDoublePole2
+class DoubleCartPole2
 {
 public:
-	CartDoublePole2();
+	DoubleCartPole2();
 	void Reset();
 	void Update(double aForceAmplitude, double aDeltaTime);
 	void Draw();

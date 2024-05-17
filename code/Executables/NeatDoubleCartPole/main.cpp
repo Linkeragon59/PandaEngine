@@ -1,9 +1,9 @@
+#include "CartPole.h"
+
 #include "Genome.h"
 #include "EvolutionParams.h"
 #include "Specie.h"
 #include "Population.h"
-#include <stdlib.h>
-#include <random>
 
 #include "Core_Facade.h"
 #include "Core_Module.h"
@@ -12,18 +12,16 @@
 #include "Core_InputModule.h"
 #include "Render_RenderModule.h"
 #include "Core_Thread.h"
-
 #include "Core_Entity.h"
 #include "Render_EntityRenderComponent.h"
 #include "imgui_helpers.h"
 
-#include "CartPole.h"
-
 #include <iostream>
+#include <random>
 
-class NeatDoublePoleBalancingModule : public Core::Module
+class NeatDoubleCartPoleModule : public Core::Module
 {
-	DECLARE_CORE_MODULE(NeatDoublePoleBalancingModule, "NeatDoublePoleBalancing")
+	DECLARE_CORE_MODULE(NeatDoubleCartPoleModule, "NeatDoubleCartPole")
 
 public:
 	GLFWwindow* GetWindow() const { return myWindow; }
@@ -40,13 +38,14 @@ private:
 	Core::Entity myGuiEntity;
 	Render::EntityGuiComponent* myGui = nullptr;
 
-	CartDoublePole2* mySystem = nullptr;
+	DoubleCartPole* mySystem = nullptr;
+	//DoubleCartPole2* mySystem = nullptr;
 };
 
-void NeatDoublePoleBalancingModule::OnInitialize()
+void NeatDoubleCartPoleModule::OnInitialize()
 {
 	Core::WindowModule::WindowParams params;
-	params.myTitle = "NEAT - Pole Balancing";
+	params.myTitle = "NEAT - Double Cart Pole";
 	myWindow = Core::WindowModule::GetInstance()->OpenWindow(params);
 	Render::RenderModule::GetInstance()->RegisterWindow(myWindow, Render::RendererType::GuiOnly);
 
@@ -54,10 +53,11 @@ void NeatDoublePoleBalancingModule::OnInitialize()
 	myGui = myGuiEntity.AddComponent<Render::EntityGuiComponent>(myWindow, false);
 	myGui->myCallback = [this]() { OnGuiUpdate(); };
 
-	mySystem = new CartDoublePole2();
+	mySystem = new DoubleCartPole();
+	//mySystem = new DoubleCartPole2();
 }
 
-void NeatDoublePoleBalancingModule::OnFinalize()
+void NeatDoubleCartPoleModule::OnFinalize()
 {
 	SafeDelete(mySystem);
 
@@ -67,7 +67,7 @@ void NeatDoublePoleBalancingModule::OnFinalize()
 	Core::WindowModule::GetInstance()->CloseWindow(myWindow);
 }
 
-void NeatDoublePoleBalancingModule::OnUpdate(Core::Module::UpdateType aType)
+void NeatDoubleCartPoleModule::OnUpdate(Core::Module::UpdateType aType)
 {
 	if (aType == Core::Module::UpdateType::EarlyUpdate)
 	{
@@ -85,7 +85,7 @@ void NeatDoublePoleBalancingModule::OnUpdate(Core::Module::UpdateType aType)
 	}
 }
 
-void NeatDoublePoleBalancingModule::OnGuiUpdate()
+void NeatDoubleCartPoleModule::OnGuiUpdate()
 {
 	mySystem->Draw();
 	ImGui::Text("Manual control");
@@ -98,11 +98,11 @@ int main()
 	Core::Facade::Create(__argc, __argv);
 
 	Render::RenderModule::Register();
-	NeatDoublePoleBalancingModule::Register();
+	NeatDoubleCartPoleModule::Register();
 
-	Core::Facade::GetInstance()->Run(NeatDoublePoleBalancingModule::GetInstance()->GetWindow());
+	Core::Facade::GetInstance()->Run(NeatDoubleCartPoleModule::GetInstance()->GetWindow());
 
-	NeatDoublePoleBalancingModule::Unregister();
+	NeatDoubleCartPoleModule::Unregister();
 	Render::RenderModule::Unregister();
 
 	Core::Facade::Destroy();

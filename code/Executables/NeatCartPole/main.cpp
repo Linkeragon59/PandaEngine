@@ -1,9 +1,9 @@
+#include "CartPole.h"
+
 #include "Genome.h"
 #include "EvolutionParams.h"
 #include "Specie.h"
 #include "Population.h"
-#include <stdlib.h>
-#include <random>
 
 #include "Core_Facade.h"
 #include "Core_Module.h"
@@ -12,18 +12,16 @@
 #include "Core_InputModule.h"
 #include "Render_RenderModule.h"
 #include "Core_Thread.h"
-
 #include "Core_Entity.h"
 #include "Render_EntityRenderComponent.h"
 #include "imgui_helpers.h"
 
-#include "CartPole.h"
-
 #include <iostream>
+#include <random>
 
-class NeatDoublePoleBalancingModule : public Core::Module
+class NeatCartPoleModule : public Core::Module
 {
-	DECLARE_CORE_MODULE(NeatDoublePoleBalancingModule, "NeatDoublePoleBalancing")
+	DECLARE_CORE_MODULE(NeatCartPoleModule, "NeatCartPole")
 
 public:
 	GLFWwindow* GetWindow() const { return myWindow; }
@@ -42,13 +40,13 @@ private:
 
 	CartPole* mySystem = nullptr;
 	bool myNeatControl = false;
-	Neat::Genome* myBalancingGenome = nullptr;
+	Neat::Genome* myGenome = nullptr;
 };
 
-void NeatDoublePoleBalancingModule::OnInitialize()
+void NeatCartPoleModule::OnInitialize()
 {
 	Core::WindowModule::WindowParams params;
-	params.myTitle = "NEAT - Pole Balancing";
+	params.myTitle = "NEAT - Cart Pole";
 	myWindow = Core::WindowModule::GetInstance()->OpenWindow(params);
 	Render::RenderModule::GetInstance()->RegisterWindow(myWindow, Render::RendererType::GuiOnly);
 
@@ -56,13 +54,13 @@ void NeatDoublePoleBalancingModule::OnInitialize()
 	myGui = myGuiEntity.AddComponent<Render::EntityGuiComponent>(myWindow, false);
 	myGui->myCallback = [this]() { OnGuiUpdate(); };
 
-	mySystem = new CartPole(false);
-	myBalancingGenome = new Neat::Genome("neat/doublePoleBalancing");
+	mySystem = new CartPole(0.0, 0.0, false);
+	myGenome = new Neat::Genome("neat/cartPole");
 }
 
-void NeatDoublePoleBalancingModule::OnFinalize()
+void NeatCartPoleModule::OnFinalize()
 {
-	SafeDelete(myBalancingGenome);
+	SafeDelete(myGenome);
 	SafeDelete(mySystem);
 
 	myGuiEntity.Destroy();
@@ -71,7 +69,7 @@ void NeatDoublePoleBalancingModule::OnFinalize()
 	Core::WindowModule::GetInstance()->CloseWindow(myWindow);
 }
 
-void NeatDoublePoleBalancingModule::OnUpdate(Core::Module::UpdateType aType)
+void NeatCartPoleModule::OnUpdate(Core::Module::UpdateType aType)
 {
 	if (aType == Core::Module::UpdateType::EarlyUpdate)
 	{
@@ -89,19 +87,16 @@ void NeatDoublePoleBalancingModule::OnUpdate(Core::Module::UpdateType aType)
 		if (myNeatControl)
 		{
 			std::vector<double> inputs;
-			inputs.push_back(mySystem->GetCartPosition());
-			inputs.push_back(mySystem->GetCartVelocity());
-			inputs.push_back(mySystem->GetPole1Angle());
-			inputs.push_back(mySystem->GetPole1Velocity());
-			inputs.push_back(mySystem->GetPole2Angle());
-			inputs.push_back(mySystem->GetPole2Velocity());
+			inputs.push_back(mySystem->GetPoleAngle());
+			inputs.push_back(mySystem->myPoleVelocity);
+			inputs.push_back(mySystem->myCartPosition);
+			inputs.push_back(mySystem->myCartVelocity);
 			std::vector<double> outputs;
-			myBalancingGenome->Evaluate(inputs, outputs);
+			myGenome->Evaluate(inputs, outputs);
 
 			double force = 1.0;
 			if (outputs[0] < outputs[1])
 				force = -1.0;
-
 			mySystem->Update(force, Core::TimeModule::GetInstance()->GetDeltaTimeSec());
 		}
 		else
@@ -121,9 +116,11 @@ void NeatDoublePoleBalancingModule::OnUpdate(Core::Module::UpdateType aType)
 	}
 }
 
-void NeatDoublePoleBalancingModule::OnGuiUpdate()
+void NeatCartPoleModule::OnGuiUpdate()
 {
-	mySystem->Draw();
+	double mouseX = 0.0, mouseY = 0.0;
+	Core::InputModule::GetInstance()->PollCursorPosition(mouseX, mouseY, myWindow);
+	mySystem->Draw(glm::vec2(mouseX, mouseY));
 	if (myNeatControl)
 	{
 		ImGui::Text("NEAT control");
@@ -134,9 +131,9 @@ void NeatDoublePoleBalancingModule::OnGuiUpdate()
 	}
 }
 
-void EvaluatePopulationAsync(Thread::WorkerPool& aPool, CartPoles& someSystems, Neat::Population& aPopulation, size_t aStartIdx, size_t aEndIdx, double aDuration)
+void EvaluatePopulationAsync(Thread::WorkerPool& aPool, CartPoles& someSystems, Neat::Population& aPopulation, size_t aStartIdx, size_t aEndIdx)
 {
-	aPool.RequestJob([&someSystems, &aPopulation, aStartIdx, aEndIdx, aDuration]() {
+	aPool.RequestJob([&someSystems, &aPopulation, aStartIdx, aEndIdx]() {
 		for (size_t i = aStartIdx; i < aEndIdx; ++i)
 		{
 			if (Neat::Genome* genome = aPopulation.GetGenome(i))
@@ -144,7 +141,7 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, CartPoles& someSystems, 
 				double fitness = 0.0;
 				
 				double deltaTime = 0.02;
-				uint maxSteps = static_cast<uint>(aDuration / deltaTime);
+				uint maxSteps = static_cast<uint>(30.0 / deltaTime);
 				double fitnessStep = 1.0 / static_cast<double>(maxSteps * someSystems.size());
 
 				for (CartPole system : someSystems)
@@ -154,12 +151,10 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, CartPoles& someSystems, 
 					for (uint t = 0; t < maxSteps; ++t)
 					{
 						std::vector<double> inputs;
-						inputs.push_back(system.GetCartPosition());
-						inputs.push_back(system.GetCartVelocity());
-						inputs.push_back(system.GetPole1Angle());
-						inputs.push_back(system.GetPole1Velocity());
-						inputs.push_back(system.GetPole2Angle());
-						inputs.push_back(system.GetPole2Velocity());
+						inputs.push_back(system.GetPoleAngle());
+						inputs.push_back(system.myPoleVelocity);
+						inputs.push_back(system.myCartPosition);
+						inputs.push_back(system.myCartVelocity);
 						std::vector<double> outputs;
 						genome->Evaluate(inputs, outputs);
 
@@ -169,7 +164,7 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, CartPoles& someSystems, 
 						
 						system.Update(force, deltaTime);
 						
-						if (!system.ArePolesUp())
+						if (!system.IsPoleUp())
 							continue;
 						if (!system.IsSlowAndCentered())
 							continue;
@@ -184,7 +179,7 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, CartPoles& someSystems, 
 	});
 }
 
-void TrainNeat(const char* aFilePath, double aDuration)
+void TrainNeat()
 {
 	Thread::WorkerPool threadPool(Thread::WorkerPriority::High);
 #if DEBUG_BUILD
@@ -194,26 +189,24 @@ void TrainNeat(const char* aFilePath, double aDuration)
 #endif
 
 	CartPoles systems;
-	//uint systemsCount = 2;
-	//systems.reserve(systemsCount + 1);
-	systems.push_back(CartPole(false));
-	//for (uint i = 0; i < systemsCount; ++i)
-	//	systems.push_back(CartPole(true));
+	uint systemsCount = 10;
+	systems.reserve(systemsCount);
+	for (uint i = 0; i < systemsCount; ++i)
+		systems.push_back(CartPole(0.0, 1.0, false));
 
 	CartPolePool systemsPool;
 	systemsPool.resize(threadPool.GetWorkersCount(), systems);
 
-	size_t popSize = 10000;
-	Neat::Population population = aFilePath ? Neat::Population(popSize, aFilePath) : Neat::Population(popSize, 6, 2);
+	Neat::Population population = Neat::Population(200, 4, 2);
 	Neat::Population::TrainingCallbacks callbacks;
 
-	callbacks.myEvaluateGenomes = [&population, &threadPool, &systemsPool, aDuration]() {
+	callbacks.myEvaluateGenomes = [&population, &threadPool, &systemsPool]() {
 		size_t runPerThread = population.GetSize() / threadPool.GetWorkersCount() + 1;
 		size_t startIdx = 0;
 		uint systemPoolIdx = 0;
 		while (startIdx < population.GetSize())
 		{
-			EvaluatePopulationAsync(threadPool, systemsPool[systemPoolIdx], population, startIdx, startIdx + runPerThread, aDuration);
+			EvaluatePopulationAsync(threadPool, systemsPool[systemPoolIdx], population, startIdx, startIdx + runPerThread);
 			startIdx = std::min(population.GetSize(), startIdx + runPerThread);
 			systemPoolIdx++;
 		}
@@ -231,7 +224,7 @@ void TrainNeat(const char* aFilePath, double aDuration)
 
 			if (generationIdx % 100 == 0)
 			{
-				std::string fileName = "neat/doublePoleBalancing";
+				std::string fileName = "neat/cartPole";
 				fileName += std::format("_{}", generationIdx);
 				bestGenome->SaveToFile(fileName.c_str());
 			}
@@ -241,14 +234,14 @@ void TrainNeat(const char* aFilePath, double aDuration)
 
 	uint64 startTime = Core::TimeModule::GetInstance()->GetCurrentTimeMs();
 
-	population.TrainGenerations(callbacks, 1000, 1.0);
+	population.TrainGenerations(callbacks, 500, 1.0);
 
 	uint64 duration = Core::TimeModule::GetInstance()->GetCurrentTimeMs() - startTime;
 	std::cout << "Training duration (ms) : " << duration << std::endl;
 
 	if (const Neat::Genome* bestGenome = population.GetBestGenome())
 	{
-		bestGenome->SaveToFile("neat/doublePoleBalancing");
+		bestGenome->SaveToFile("neat/cartPole");
 		std::cout << "Best Fitness : " << bestGenome->GetFitness() << std::endl;
 	}
 }
@@ -262,23 +255,15 @@ int main()
 	std::random_device rd;
 	unsigned int seed = rd();
 	Neat::EvolutionParams::SetRandomSeed(seed);
-	TrainNeat(nullptr, 5.0);
-	//Neat::EvolutionParams::ourNewNodeProba = 0.1;
-	//Neat::EvolutionParams::ourNewLinkProba = 0.1;
-	//double duration = 10.0;
-	//TrainNeat(nullptr, 10.0);
-	//while (duration < 100.0)
-	//{
-	//	duration += duration;
-	//	TrainNeat("neat/doublePoleBalancing", duration);
-	//}
+
+	//TrainNeat();
 
 	Render::RenderModule::Register();
-	NeatDoublePoleBalancingModule::Register();
+	NeatCartPoleModule::Register();
 
-	Core::Facade::GetInstance()->Run(NeatDoublePoleBalancingModule::GetInstance()->GetWindow());
+	Core::Facade::GetInstance()->Run(NeatCartPoleModule::GetInstance()->GetWindow());
 
-	NeatDoublePoleBalancingModule::Unregister();
+	NeatCartPoleModule::Unregister();
 	Render::RenderModule::Unregister();
 
 	Core::Facade::Destroy();
