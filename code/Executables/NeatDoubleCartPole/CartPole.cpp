@@ -5,7 +5,7 @@
 
 #define PI 3.14159265358979323846
 
-DoubleCartPole::DoubleCartPole()
+DoubleCartPoleBase::DoubleCartPoleBase()
 {
 	myInitState[0] = 0.0;
 	myInitState[1] = PI;
@@ -16,7 +16,7 @@ DoubleCartPole::DoubleCartPole()
 	Reset();
 }
 
-void DoubleCartPole::Reset()
+void DoubleCartPoleBase::Reset()
 {
 	myState[0] = myInitState[0];
 	myState[1] = myInitState[1];
@@ -26,9 +26,41 @@ void DoubleCartPole::Reset()
 	myState[5] = myInitState[5];
 }
 
-void DoubleCartPole::Update(double aForceAmplitude, double aDeltaTime)
+void DoubleCartPoleBase::Update(double aForceAmplitude, double aDeltaTime)
 {
+	if (aForceAmplitude > 0.0 && myState[0] >= myCartTrackSize)
+		aForceAmplitude = 0.0;
+	else if (aForceAmplitude < 0.0 && myState[0] <= -myCartTrackSize)
+		aForceAmplitude = 0.0;
+
 	RK4(aForceAmplitude * myInputForce, aDeltaTime);
+
+	if (myState[3] > 0.0 && myState[0] >= myCartTrackSize)
+		myState[3] = 0.0;
+	else if (myState[3] < 0.0 && myState[0] <= -myCartTrackSize)
+		myState[3] = 0.0;
+}
+
+void DoubleCartPoleBase::RK4(double aForce, double aDeltaTime)
+{
+	double k1[6], k2[6], k3[6], k4[6], tmp[6];
+
+	Step(k1, myState, aForce);
+
+	for (uint i = 0; i < 6; ++i)
+		tmp[i] = myState[i] + (aDeltaTime / 2.0) * k1[i];
+	Step(k2, tmp, aForce);
+
+	for (uint i = 0; i < 6; ++i)
+		tmp[i] = myState[i] + (aDeltaTime / 2.0) * k2[i];
+	Step(k3, tmp, aForce);
+
+	for (uint i = 0; i < 6; ++i)
+		tmp[i] = myState[i] + aDeltaTime * k3[i];
+	Step(k4, tmp, aForce);
+
+	for (uint i = 0; i < 6; ++i)
+		myState[i] = myState[i] + (aDeltaTime / 6.0) * (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]);
 }
 
 void DoubleCartPole::Draw()
@@ -73,64 +105,16 @@ void DoubleCartPole::Step(double* dydt, double* y, double aForce)
 	double tmp2 = MUP * y[5] / (myPole2Length * myPole2Mass);
 
 	double f1 = (myPole1Length * myPole1Mass * y[4] * y[4] * sin1) +
-		(0.75 * myPole1Mass * cos1 * (tmp1 + myGravity * sin1));
+		(0.75 * myPole1Mass * cos1 * (tmp1 - myGravity * sin1));
 	double f2 = (myPole2Length * myPole2Mass * y[5] * y[5] * sin2) +
-		(0.75 * myPole2Mass * cos2 * (tmp2 + myGravity * sin2));
+		(0.75 * myPole2Mass * cos2 * (tmp2 - myGravity * sin2));
 
 	double m1 = myPole1Mass * (1.0 - (0.75 * cos1 * cos1));
 	double m2 = myPole2Mass * (1.0 - (0.75 * cos2 * cos2));
 
 	dydt[3] = (aForce + f1 + f2) / (m1 + m2 + myCartMass);
-	dydt[4] = -0.75 * (dydt[3] * cos1 + myGravity * sin1 + tmp1) / myPole1Length;
-	dydt[5] = -0.75 * (dydt[3] * cos2 + myGravity * sin2 + tmp2) / myPole2Length;
-}
-
-void DoubleCartPole::RK4(double aForce, double aDeltaTime)
-{
-	double k1[6], k2[6], k3[6], k4[6], tmp[6];
-
-	Step(k1, myState, aForce);
-
-	for (uint i = 0; i < 6; ++i)
-		tmp[i] = myState[i] + (aDeltaTime / 2.0) * k1[i];
-	Step(k2, tmp, aForce);
-
-	for (uint i = 0; i < 6; ++i)
-		tmp[i] = myState[i] + (aDeltaTime / 2.0) * k2[i];
-	Step(k3, tmp, aForce);
-
-	for (uint i = 0; i < 6; ++i)
-		tmp[i] = myState[i] + aDeltaTime * k3[i];
-	Step(k4, tmp, aForce);
-
-	for (uint i = 0; i < 6; ++i)
-		myState[i] = myState[i] + (aDeltaTime / 6.0) * (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]);
-}
-
-DoubleCartPole2::DoubleCartPole2()
-{
-	myInitState[0] = 0.0;
-	myInitState[1] = PI;
-	myInitState[2] = PI;
-	myInitState[3] = 0.0;
-	myInitState[4] = 0.0;
-	myInitState[5] = 0.0;
-	Reset();
-}
-
-void DoubleCartPole2::Reset()
-{
-	myState[0] = myInitState[0];
-	myState[1] = myInitState[1];
-	myState[2] = myInitState[2];
-	myState[3] = myInitState[3];
-	myState[4] = myInitState[4];
-	myState[5] = myInitState[5];
-}
-
-void DoubleCartPole2::Update(double aForceAmplitude, double aDeltaTime)
-{
-	RK4(aForceAmplitude * myInputForce, aDeltaTime);
+	dydt[4] = -0.75 * (dydt[3] * cos1 - myGravity * sin1 + tmp1) / myPole1Length - myPoleFriction * dydt[1];
+	dydt[5] = -0.75 * (dydt[3] * cos2 - myGravity * sin2 + tmp2) / myPole2Length - myPoleFriction * dydt[2];
 }
 
 void DoubleCartPole2::Draw()
@@ -205,26 +189,4 @@ void DoubleCartPole2::Step(double* dydt, double* y, double aForce)
 	dydt[3] = ddy[0];
 	dydt[4] = ddy[1] - myPoleFriction * dydt[1];
 	dydt[5] = ddy[2] - myPoleFriction * dydt[2];
-}
-
-void DoubleCartPole2::RK4(double aForce, double aDeltaTime)
-{
-	double k1[6], k2[6], k3[6], k4[6], tmp[6];
-
-	Step(k1, myState, aForce);
-
-	for (uint i = 0; i < 6; ++i)
-		tmp[i] = myState[i] + (aDeltaTime / 2.0) * k1[i];
-	Step(k2, tmp, aForce);
-
-	for (uint i = 0; i < 6; ++i)
-		tmp[i] = myState[i] + (aDeltaTime / 2.0) * k2[i];
-	Step(k3, tmp, aForce);
-
-	for (uint i = 0; i < 6; ++i)
-		tmp[i] = myState[i] + aDeltaTime * k3[i];
-	Step(k4, tmp, aForce);
-
-	for (uint i = 0; i < 6; ++i)
-		myState[i] = myState[i] + (aDeltaTime / 6.0) * (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]);
 }

@@ -19,6 +19,8 @@
 #include <iostream>
 #include <random>
 
+#define POLE_ON_POLE 1 // O for 2 poles attached to the cart, 1 for a pole attached to the cart and a pole attached to the other pole
+
 class NeatDoubleCartPoleModule : public Core::Module
 {
 	DECLARE_CORE_MODULE(NeatDoubleCartPoleModule, "NeatDoubleCartPole")
@@ -38,8 +40,7 @@ private:
 	Core::Entity myGuiEntity;
 	Render::EntityGuiComponent* myGui = nullptr;
 
-	DoubleCartPole* mySystem = nullptr;
-	//DoubleCartPole2* mySystem = nullptr;
+	DoubleCartPoleBase* mySystem = nullptr;
 };
 
 void NeatDoubleCartPoleModule::OnInitialize()
@@ -53,8 +54,11 @@ void NeatDoubleCartPoleModule::OnInitialize()
 	myGui = myGuiEntity.AddComponent<Render::EntityGuiComponent>(myWindow, false);
 	myGui->myCallback = [this]() { OnGuiUpdate(); };
 
+#if POLE_ON_POLE
+	mySystem = new DoubleCartPole2();
+#else
 	mySystem = new DoubleCartPole();
-	//mySystem = new DoubleCartPole2();
+#endif
 }
 
 void NeatDoubleCartPoleModule::OnFinalize()
