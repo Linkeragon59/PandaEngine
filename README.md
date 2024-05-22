@@ -1,14 +1,8 @@
-# DiffractionProto
+# Panda Engine
 
-TODO List:
-- Read the values ranges (for slits width and spacing, min and max wave lenght, etc...) from a data file (JSON?)
-- Add single and dual windows modes
-- Improve the curve position on the secondary windows
-- Add diffraction by holes (square, round)
+Mini game engine I wrote for fun and to give me a base to code other small projects on top of it. I'm adding features whenever required by the projects I base on it.
+It's capable of rendering 2D (with ImGui) and 3D using the Vulkan API.
 
-References:
-https://www.eyefactive.com/en/touchscreen-object-recognition
-
-https://www.interactive-scape.com/blog/multitouch-object-recognition-what-is-it?lng=en
-
-https://medium.com/swlh/building-your-own-interactive-touchscreen-table-with-object-recognition-768b663ccce8
+Current projects built on top of Panda Engine:
+- Playing with NEAT (NeuroEvolution of Augmenting Topologies). Implemented NEAT in a separate static lib that I can use from the Panda Engine projects. Implemented a training of the CartPole and Acrobot problems
+  
