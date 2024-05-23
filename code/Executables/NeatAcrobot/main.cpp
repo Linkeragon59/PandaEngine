@@ -175,7 +175,7 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, Acrobots& someSystems, N
 				genome->SetFitness(fitness);
 			}
 		}
-		});
+	});
 }
 
 void TrainNeat()

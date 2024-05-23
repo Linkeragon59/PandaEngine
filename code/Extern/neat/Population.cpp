@@ -181,6 +181,9 @@ void Population::StartGeneration()
 	// And group all genomes (offsprings of the previous generation) that already know about their specie
 	for (Genome& genome : myGenomes)
 	{
+		genome.SetFitness(0.0);
+		genome.AdjustFitness(0.0);
+
 		if (Specie* specie = genome.GetSpecie())
 		{
 			specie->AddGenome(&genome);
@@ -208,9 +211,6 @@ void Population::StartGeneration()
 	{
 		if (genome.GetSpecie())
 			continue;
-
-		if (genome.GetNodesCount() > 4)
-			genome.SetFitness(genome.GetFitness());
 
 		for (Specie* specie : mySpecies)
 		{

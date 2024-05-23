@@ -9,6 +9,7 @@
 #include <string>
 #include <memory>
 #include <algorithm>
+#include <numbers>
 
 typedef int8_t int8;
 typedef int16_t int16;
