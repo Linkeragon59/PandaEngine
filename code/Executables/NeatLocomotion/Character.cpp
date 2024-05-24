@@ -89,9 +89,9 @@ float Character::ComputePositionFitness(const Character& anOther) const
 	float aimInfo;
 	GetBrainInputs(anOther, distanceInfo, alignementInfo, aimInfo);
 
-	fitness *= std::exp(-10.f * std::abs(distanceInfo));
-	fitness *= std::exp(-3.f * std::abs(alignementInfo));
-	fitness *= std::exp(-3.f * std::abs(aimInfo));
+	fitness *= std::exp(-10.f * std::abs(distanceInfo)); // Try to be at a reasonable distance from the player 
+	fitness *= std::exp(-3.f * std::abs(alignementInfo)) - std::exp(-50.f * std::abs(alignementInfo)); // Don't be exactly aligned with the player (to avoid being shot)
+	fitness *= std::exp(-3.f * std::abs(aimInfo)); // Try to aim at the player
 
 	return fitness;
 }
