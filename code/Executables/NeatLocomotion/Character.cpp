@@ -76,8 +76,8 @@ void Character::GetBrainInputs(const Character& anOther, float& aDistanceInfo, f
 	aDistanceInfo = std::clamp(glm::length(charToCharVec) / NICE_CHARACTERS_DISTANCE - 1.f, -1.f, 1.f);
 	
 	charToCharVec = glm::normalize(charToCharVec);
-	anAlignementInfo = glm::dot(charToCharVec, anOther.myForwardVec);
-	anAimInfo = glm::dot(-charToCharVec, myForwardVec);
+	anAlignementInfo = std::atan2(charToCharVec.x * anOther.myForwardVec.y - anOther.myForwardVec.x * charToCharVec.y, charToCharVec.x * anOther.myForwardVec.x + charToCharVec.y * anOther.myForwardVec.y) / (float)std::numbers::pi;
+	anAimInfo = std::atan2(-charToCharVec.x * myForwardVec.y - myForwardVec.x * -charToCharVec.y, -charToCharVec.x * myForwardVec.x + -charToCharVec.y * myForwardVec.y) / (float)std::numbers::pi;
 }
 
 float Character::ComputePositionFitness(const Character& anOther) const
@@ -90,8 +90,8 @@ float Character::ComputePositionFitness(const Character& anOther) const
 	GetBrainInputs(anOther, distanceInfo, alignementInfo, aimInfo);
 
 	fitness *= std::exp(-10.f * std::abs(distanceInfo));
-	fitness *= std::exp(-3.f * std::abs(alignementInfo - 1.f));
-	fitness *= std::exp(-3.f * std::abs(aimInfo - 1.f));
+	fitness *= std::exp(-3.f * std::abs(alignementInfo));
+	fitness *= std::exp(-3.f * std::abs(aimInfo));
 
 	return fitness;
 }

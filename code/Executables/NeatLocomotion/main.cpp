@@ -105,17 +105,23 @@ void NeatLocomotionModule::OnUpdate(Core::Module::UpdateType aType)
 			float forwardForce = 0.f;
 			float rightForce = 0.f;
 			float rotationForce = 0.f;
-			if (Core::InputModule::GetInstance()->PollKeyInput(Input::KeyNumPad8, myWindow) == Input::Status::Pressed)
+			if (Core::InputModule::GetInstance()->PollKeyInput(Input::KeyNumPad8, myWindow) == Input::Status::Pressed
+				|| Core::InputModule::GetInstance()->PollKeyInput(Input::KeyW, myWindow) == Input::Status::Pressed)
 				forwardForce += 1.f;
-			if (Core::InputModule::GetInstance()->PollKeyInput(Input::KeyNumPad2, myWindow) == Input::Status::Pressed)
+			if (Core::InputModule::GetInstance()->PollKeyInput(Input::KeyNumPad2, myWindow) == Input::Status::Pressed
+				|| Core::InputModule::GetInstance()->PollKeyInput(Input::KeyS, myWindow) == Input::Status::Pressed)
 				forwardForce -= 1.f;
-			if (Core::InputModule::GetInstance()->PollKeyInput(Input::KeyNumPad6, myWindow) == Input::Status::Pressed)
+			if (Core::InputModule::GetInstance()->PollKeyInput(Input::KeyNumPad6, myWindow) == Input::Status::Pressed
+				|| Core::InputModule::GetInstance()->PollKeyInput(Input::KeyD, myWindow) == Input::Status::Pressed)
 				rightForce += 1.f;
-			if (Core::InputModule::GetInstance()->PollKeyInput(Input::KeyNumPad4, myWindow) == Input::Status::Pressed)
+			if (Core::InputModule::GetInstance()->PollKeyInput(Input::KeyNumPad4, myWindow) == Input::Status::Pressed
+				|| Core::InputModule::GetInstance()->PollKeyInput(Input::KeyA, myWindow) == Input::Status::Pressed)
 				rightForce -= 1.f;
-			if (Core::InputModule::GetInstance()->PollKeyInput(Input::KeyNumPad9, myWindow) == Input::Status::Pressed)
+			if (Core::InputModule::GetInstance()->PollKeyInput(Input::KeyNumPad9, myWindow) == Input::Status::Pressed
+				|| Core::InputModule::GetInstance()->PollKeyInput(Input::KeyE, myWindow) == Input::Status::Pressed)
 				rotationForce += 1.f;
-			if (Core::InputModule::GetInstance()->PollKeyInput(Input::KeyNumPad7, myWindow) == Input::Status::Pressed)
+			if (Core::InputModule::GetInstance()->PollKeyInput(Input::KeyNumPad7, myWindow) == Input::Status::Pressed
+				|| Core::InputModule::GetInstance()->PollKeyInput(Input::KeyQ, myWindow) == Input::Status::Pressed)
 				rotationForce -= 1.f;
 			mySystem->myPlayer.Update(Core::TimeModule::GetInstance()->GetDeltaTimeSec(), forwardForce, rightForce, rotationForce);
 		}
@@ -184,6 +190,12 @@ void NeatLocomotionModule::OnGuiUpdate()
 		ImGui::Text("NEAT control");
 	}
 	ImGui::Text("Fitness: %.2f", mySystem->myNPC.ComputePositionFitness(mySystem->myPlayer));
+
+	float distanceInfo;
+	float alignementInfo;
+	float aimInfo;
+	mySystem->myNPC.GetBrainInputs(mySystem->myPlayer, distanceInfo, alignementInfo, aimInfo);
+	ImGui::Text("%f, %f, %f", distanceInfo, alignementInfo, aimInfo);
 }
 
 void EvaluatePopulationAsync(Thread::WorkerPool& aPool, CharactersSystems& someSystems, Neat::Population& aPopulation, size_t aStartIdx, size_t aEndIdx)
@@ -196,7 +208,7 @@ void EvaluatePopulationAsync(Thread::WorkerPool& aPool, CharactersSystems& someS
 				double fitness = 0.0;
 
 				float deltaTime = 0.02f;
-				uint maxSteps = static_cast<uint>(20.f / deltaTime);
+				uint maxSteps = static_cast<uint>(10.f / deltaTime);
 				double fitnessStep = 1.0 / static_cast<double>(maxSteps * someSystems.size());
 
 				for (CharactersSystem system : someSystems)
@@ -328,7 +340,7 @@ int main()
 	unsigned int seed = rd();
 	Neat::EvolutionParams::SetRandomSeed(seed);
 
-	TrainNeat();
+	//TrainNeat();
 
 	Render::RenderModule::Register();
 	NeatLocomotionModule::Register();
